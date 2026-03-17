@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: PLACEHOLDER_APP_NAME
+  name: app
   labels:
-    app: PLACEHOLDER_APP_NAME
-    actorSystemName: PLACEHOLDER_APP_NAME
+    app: app
+    actorSystemName: app
 spec:
   replicas: 3
   revisionHistoryLimit: 10  # Higher than standard (3) for cluster state rollback safety
@@ -16,14 +16,14 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      app: PLACEHOLDER_APP_NAME
+      app: app
   template:
     metadata:
       labels:
-        app: PLACEHOLDER_APP_NAME
-        actorSystemName: PLACEHOLDER_APP_NAME
+        app: app
+        actorSystemName: app
     spec:
-      serviceAccountName: PLACEHOLDER_SERVICE_ACCOUNT
+      serviceAccountName: app
       terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
@@ -31,11 +31,11 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: PLACEHOLDER_APP_NAME
-      imagePullSecrets:
-        - name: PLACEHOLDER_IMAGE_PULL_SECRET
+              app: app
+      # imagePullSecrets — add via patch if your registry requires auth
+      # See README "Image Pull Secrets" section for .env-driven pattern
       containers:
-        - name: PLACEHOLDER_APP_NAME
+        - name: app
           image: PLACEHOLDER_IMAGE
           imagePullPolicy: IfNotPresent
           ports:
@@ -55,7 +55,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: APP_LABEL
-              value: "PLACEHOLDER_APP_NAME"
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app']
             - name: REQUIRED_CONTACT_POINT_NR
               value: "1"
             - name: JAVA_TOOL_OPTIONS
