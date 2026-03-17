@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: PLACEHOLDER_APP_NAME
+  labels:
+    app: PLACEHOLDER_APP_NAME
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: PLACEHOLDER_APP_NAME
