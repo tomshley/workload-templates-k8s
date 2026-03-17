@@ -4,7 +4,8 @@ kind: Kustomization
 labels:
   - pairs:
       app.kubernetes.io/managed-by: kustomize
-    includeSelectors: true
+    includeSelectors: false
+    includeTemplates: true
 
 resources:
   - cronjob.yaml

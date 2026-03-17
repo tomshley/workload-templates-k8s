@@ -3,7 +3,7 @@
 # This file teaches Kustomize how to rewrite cross-resource references
 # when namePrefix, nameSuffix, or name transformers are applied.
 #
-# Without this, a namePrefix like "ingress-" would rename the ServiceAccount
+# Without this, a namePrefix like "egress-" would rename the ServiceAccount
 # but leave serviceAccountName in Deployments pointing to the old name.
 #
 # Usage:
@@ -28,7 +28,7 @@ nameReference:
       - path: spec/serviceName
         kind: StatefulSet
 
-  # Secret references (imagePullSecrets)
+  # Secret references (imagePullSecrets — added by consumer patches, not in templates)
   - kind: Secret
     fieldSpecs:
       - path: spec/template/spec/imagePullSecrets/name
@@ -43,6 +43,19 @@ nameReference:
     fieldSpecs:
       - path: roleRef/name
         kind: RoleBinding
+
+# Label fieldSpecs — extend labels transformer to non-default paths
+# topologySpreadConstraints labelSelector is NOT in Kustomize's default label injection paths.
+# Without this, consumer labels won't propagate to topology spread, breaking pod distribution.
+# Use `labels:` if supported by the project's Kustomize version; otherwise use `commonLabels:`
+# for transformer configuration compatibility. See: https://github.com/kubernetes-sigs/kustomize/issues/5527
+commonLabels:
+  - path: spec/template/spec/topologySpreadConstraints/labelSelector/matchLabels
+    create: true
+    kind: Deployment
+  - path: spec/template/spec/topologySpreadConstraints/labelSelector/matchLabels
+    create: true
+    kind: StatefulSet
 
 images:
   - path: spec/template/spec/containers[]/image
