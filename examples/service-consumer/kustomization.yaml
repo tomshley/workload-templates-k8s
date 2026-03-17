@@ -3,50 +3,62 @@ kind: Kustomization
 
 # Example: How a service repository consumes workload templates remotely
 #
-# Service repos reference templates via GitLab/GitHub URLs instead of copying manifests.
-# This example shows:
-# - Remote resource references
-# - Namespace assignment
-# - Name prefixing to avoid collisions
-# - Image substitution
-# - commonLabels for observability
+# Identity Model:
+#   Labels define identity. Names are cosmetic.
+#   Consumer sets `app` label via `labels` with `includeSelectors: true`.
+#   Kustomize propagates labels to selectors, pod templates, PDBs, and Services.
+#   `namePrefix` handles resource name uniqueness independently.
 #
-# IMPORTANT: When using namePrefix/nameSuffix with remote templates, also fetch
-# the kustomizeconfig.yaml to ensure cross-resource references are rewritten correctly.
-# See configurations section below.
+# This example shows:
+# - Remote resource references with version pinning
+# - Label-driven identity (app label = service identity)
+# - Namespace assignment
+# - Name prefixing for resource name uniqueness
+# - Image substitution
+# - Pekko-specific actorSystemName (separate from selectors)
+#
+# IMPORTANT: Always fetch kustomizeconfig.yaml to ensure cross-resource references
+# (ServiceAccount, Service, Secret, Role) and topologySpreadConstraints labels
+# are rewritten correctly.
 
 namespace: my-platform
 
 # Prefix all resource names to avoid collisions in shared namespaces
-namePrefix: my-service-
+# Result: metadata.name becomes "egress-app", "egress-app-bootstrap", etc.
+namePrefix: egress-
 
-# Fetch kustomizeconfig.yaml for safe name transformations
-# Without this, namePrefix won't rewrite ServiceAccount references, Service references, etc.
+# Fetch kustomizeconfig.yaml for safe name + label transformations
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.0.2
 
 # Remote template references (GitLab URL format)
 # Pattern: gitlab.com/{org}/{repo}//{path}?ref={version}
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v1.0.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v1.0.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/pdb?ref=v1.0.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/service-headless-pekko-bootstrap?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//components/pdb?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//components/service-headless-pekko-bootstrap?ref=v0.0.2
   # Note: DNS bootstrap via headless service. For K8s API bootstrap, use rbac-pod-reader instead.
 
-# Standard labels for platform observability
+# Identity labels — `app` is the canonical selector/routing label
+# Must be unique per deployment in the namespace to avoid cross-selection
 labels:
   - pairs:
-      app.kubernetes.io/name: my-service
-      app.kubernetes.io/component: pekko-cluster
-      app.kubernetes.io/part-of: my-platform
-      app.kubernetes.io/managed-by: kustomize
+      app: egress
     includeSelectors: true
+
+  # Pekko-specific: actorSystemName for cluster member discovery
+  # Separate block keeps it out of Service/PDB selectors (no unnecessary coupling)
+  # Non-Pekko consumers (deployment-http, stateful-service, cron-job) omit this block
+  - pairs:
+      actorSystemName: egress
+    includeSelectors: false
+    includeTemplates: true
 
 # Replace placeholder image with actual service image
 images:
   - name: PLACEHOLDER_IMAGE
-    newName: registry.example.com/my-org/my-service
+    newName: registry.example.com/my-org/egress-server
     newTag: "1.0.0"
 
 # Service-specific configuration patches would go in patches/ directory
@@ -56,7 +68,7 @@ images:
 #   - path: patches/deployment-env.yaml
 #     target:
 #       kind: Deployment
-#       name: PLACEHOLDER_APP_NAME
+#       name: app
 #
 # Where patches/deployment-env.yaml contains:
 #

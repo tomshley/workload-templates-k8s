@@ -51,7 +51,7 @@ validate-kustomize:
       done
       
       # Validate local-path examples (skip service-consumer which has remote URLs)
-      for dir in examples/pekko-cluster-dns-bootstrap examples/pekko-cluster-kubernetes-api-bootstrap; do
+      for dir in examples/pekko-cluster-dns-bootstrap examples/pekko-cluster-kubernetes-api-bootstrap examples/image-pull-secret; do
         if [ -f "${dir}/kustomization.yaml" ]; then
           echo "Validating ${dir}..."
           kustomize build "$dir" > /dev/null || FAILED=1

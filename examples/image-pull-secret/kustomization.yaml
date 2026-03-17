@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Example: Adding imagePullSecrets to workloads
+#
+# Templates don't include imagePullSecrets by default.
+# This example shows how to add them via strategic merge patch.
+#
+# The secret name (my-registry-credentials) must match:
+# 1. A pre-created K8s Secret in the target namespace
+# 2. The K8S_IMAGE_PULL_SECRET value in .secure_files/.env (if using CI/CD)
+#
+# CI creates the Secret from registry credentials, overlay references it.
+
+resources:
+  - ../../workloads/deployment-http
+  - ../../components/serviceaccount
+
+# Apply imagePullSecrets patch to Deployment
+patches:
+  - path: patches/deployment-image-pull-secret.yaml
+    target:
+      kind: Deployment
+      name: app

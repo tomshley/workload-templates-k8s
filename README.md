@@ -61,6 +61,7 @@ components/
   serviceaccount/         — ServiceAccount
 
 examples/
+  image-pull-secret/                      — imagePullSecrets patch pattern
   pekko-cluster-dns-bootstrap/            — DNS-based Pekko Cluster bootstrap
   pekko-cluster-kubernetes-api-bootstrap/ — Kubernetes API-based Pekko Cluster bootstrap
   service-consumer/                       — Remote consumption patterns
@@ -68,7 +69,7 @@ examples/
 assets/
   brand/
 
-kustomizeconfig.yaml — Kustomize nameReference/image transformation configuration
+kustomizeconfig.yaml — Kustomize nameReference, label fieldSpecs, and image transformation configuration
 VERSION
 ```
 
@@ -84,8 +85,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v1.0.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.0.2
 ```
 
 Benefits:
@@ -98,7 +99,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.0.2
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
@@ -109,40 +110,53 @@ This ensures cross-resource references (ServiceAccount, Service, Secret, Role) a
 
 ---
 
-## Placeholder Consistency
+## Identity Model
 
-Templates use placeholders that **must remain consistent** across composed resources:
+> **Labels define identity. Names are cosmetic.**
 
-- **`PLACEHOLDER_APP_NAME`** — Used in labels (`app`, `actorSystemName`), container names, and resource names
-- **`PLACEHOLDER_SERVICE_ACCOUNT`** — Must match between `serviceAccountName` in workloads and `metadata.name` in serviceaccount component
-- **`PLACEHOLDER_IMAGE_PULL_SECRET`** — Must match your registry credentials secret name
-- **`PLACEHOLDER_IMAGE`** — Container image reference
+Templates use short default names (`app`) that Kustomize's `namePrefix` transforms into clean, production-ready resource names. Service identity is driven by **labels**, not resource names.
 
-When composing workloads + components, ensure these placeholders are replaced with the same values via Kustomize overlays or direct substitution.
+### How It Works
 
-### Important: Label Injection Behavior
-
-Templates include `labels` with `includeSelectors: true` in their kustomization.yaml files:
+Consumer overlays set the `app` label via Kustomize's `labels` transformer:
 
 ```yaml
 labels:
   - pairs:
-      app.kubernetes.io/managed-by: kustomize
+      app: egress
     includeSelectors: true
 ```
 
-Kustomize's `labels` with `includeSelectors` injects labels into **both** `metadata.labels` and `spec.selector.matchLabels` (for Deployment, StatefulSet, PDB). This ensures consistent labeling but creates coupling:
+Kustomize propagates labels to:
+- `metadata.labels` on all resources
+- `spec.selector.matchLabels` on Deployments, StatefulSets, PDBs
+- `spec.template.metadata.labels` on pod templates
+- `spec.selector` on Services
 
-- If you override or omit these labels in your overlay, selectors may not match pods
-- Consumer overlays should **merge** with template labels, not replace them
+This ensures consistent identity across all composed resources without manual patching.
 
-This is intentional for observability and consistent resource labeling across the platform.
+### Best Practice
 
-### Critical: ServiceAccount Binding
+The `app` label **must be unique per deployment** in a namespace. Two services with `app: egress` in the same namespace will cross-select (PDBs target wrong pods, Services route to wrong backends, Pekko clusters cross-discover).
 
-The workload's `serviceAccountName: PLACEHOLDER_SERVICE_ACCOUNT` **must match** the ServiceAccount component's `metadata.name: PLACEHOLDER_SERVICE_ACCOUNT`.
+### `PLACEHOLDER_IMAGE`
 
-If you override the ServiceAccount name in your overlay, you **must also** patch the workload's `serviceAccountName` field to match.
+`PLACEHOLDER_IMAGE` is the only remaining placeholder. It works natively with Kustomize's `images` transformer:
+
+```yaml
+images:
+  - name: PLACEHOLDER_IMAGE
+    newName: registry.example.com/my-org/egress-server
+    newTag: "1.0.0"
+```
+
+### ServiceAccount Binding
+
+Workloads and the ServiceAccount component both use `app` as the default name. When `namePrefix` is applied, `kustomizeconfig.yaml` rewrites `serviceAccountName` references automatically. If you override the ServiceAccount name in your overlay, you **must also** patch the workload's `serviceAccountName` field to match.
+
+### APP_LABEL Environment Variable (Pekko Cluster)
+
+The `pekko-cluster` template exposes `APP_LABEL` as an env var for Pekko's contact-point discovery. This value is sourced from the pod's actual `app` label at runtime via the Downward API (`metadata.labels['app']`), so it always reflects the consumer's identity — no manual coordination required.
 
 ---
 
@@ -161,7 +175,7 @@ Override via Kustomize patches in your service overlay:
 patches:
   - target:
       kind: Deployment
-      name: PLACEHOLDER_APP_NAME
+      name: app
     patch: |-
       - op: replace
         path: /spec/replicas
@@ -185,6 +199,50 @@ patches:
 
 ---
 
+## Image Pull Secrets
+
+Templates intentionally **omit** `imagePullSecrets` by default. If your registry requires authentication (e.g., private GitLab/GitHub Container Registry, Docker Hub private repos), add `imagePullSecrets` via a strategic merge patch in your overlay.
+
+### Pattern
+
+See `examples/image-pull-secret/` for the complete pattern:
+
+```yaml
+# examples/image-pull-secret/kustomization.yaml
+resources:
+  - ../../workloads/deployment-http
+  - ../../components/serviceaccount
+
+patches:
+  - path: patches/deployment-image-pull-secret.yaml
+    target:
+      kind: Deployment
+      name: app
+```
+
+```yaml
+# examples/image-pull-secret/patches/deployment-image-pull-secret.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: my-registry-credentials
+```
+
+### CI/CD Integration
+
+The secret name (`my-registry-credentials`) must match:
+1. A pre-created Kubernetes Secret in your target namespace
+2. The `K8S_IMAGE_PULL_SECRET` value in your `.secure_files/.env` (if using GitLab CI)
+
+CI creates the Secret from registry credentials before deploying. Your Kustomize overlay references it.
+
+---
+
 ## Pekko Cluster Configuration
 
 The `pekko-cluster` template provides Kubernetes-level safety (rolling updates, pod distribution, graceful shutdown). **Application-level cluster safety** requires configuration in your service's `application.conf`:
@@ -202,6 +260,20 @@ The template's `replicas: 3` default supports majority-based split-brain resolut
 - The `keep-majority` strategy is recommended for Kubernetes deployments
 
 See [Pekko Split Brain Resolver documentation](https://pekko.apache.org/docs/pekko/current/split-brain-resolver.html) for detailed configuration options.
+
+### PDB and Replica Count Interaction
+
+The `pdb` component sets `maxUnavailable: 1`, which is safe with the default 3 replicas (majority of 3 = 2; losing 1 pod is survivable). **If you reduce replicas to 2**, the PDB becomes unsafe with `keep-majority` SBR:
+
+- Majority of 2 = **2** (both must be up)
+- PDB allows K8s to voluntarily disrupt 1 pod (e.g. node drain)
+- Surviving pod has no quorum → SBR shuts it down → **complete cluster outage**
+
+If you need 2 replicas, override the PDB to `maxUnavailable: 0` (blocks voluntary disruptions) or use a different SBR strategy.
+
+### CPU Limits
+
+Per [Akka](https://doc.akka.io/libraries/akka-core/current/additional/deploying.html) and [Pekko](https://pekko.apache.org/docs/pekko/current/additional/deploying.html) recommendations, templates intentionally **omit CPU limits** to avoid CFS scheduler throttling. Only `resources.requests.cpu` is set. Use `-XX:ActiveProcessorCount` to control JVM thread pool sizing when no CPU limit is present.
 
 ---
 

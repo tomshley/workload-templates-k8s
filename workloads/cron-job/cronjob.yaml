@@ -1,28 +1,28 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: PLACEHOLDER_APP_NAME
+  name: app
   labels:
-    app: PLACEHOLDER_APP_NAME
+    app: app
 spec:
   schedule: "0 0 * * *"
   concurrencyPolicy: Forbid
   jobTemplate:
     metadata:
       labels:
-        app: PLACEHOLDER_APP_NAME
+        app: app
     spec:
       template:
         metadata:
           labels:
-            app: PLACEHOLDER_APP_NAME
+            app: app
         spec:
-          serviceAccountName: PLACEHOLDER_SERVICE_ACCOUNT
+          serviceAccountName: app
           restartPolicy: OnFailure
-          imagePullSecrets:
-            - name: PLACEHOLDER_IMAGE_PULL_SECRET
+          # imagePullSecrets — add via patch if your registry requires auth
+          # See README "Image Pull Secrets" section for .env-driven pattern
           containers:
-            - name: PLACEHOLDER_APP_NAME
+            - name: app
               image: PLACEHOLDER_IMAGE
               imagePullPolicy: IfNotPresent
               env:
