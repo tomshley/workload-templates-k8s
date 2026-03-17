@@ -1,0 +1,28 @@
+# --- BEGIN multi-project ignores ---
+
+# IDE
+.idea/
+*.iml
+.metals/
+.vscode/
+
+# Logs
+*.log
+
+# Secrets
+*.env
+.secure-files/*
+!.secure-files/
+!.secure-files/*.example
+cache.config
+credentials.config
+endpoint.config
+
+# OS
+.DS_Store
+Thumbs.db
+
+# --- END multi-project ignores ---
+
+# Credentials
+.tware.resolver.*.cred
