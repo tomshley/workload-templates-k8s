@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: PLACEHOLDER_APP_NAME
+  name: app
   labels:
-    app: PLACEHOLDER_APP_NAME
+    app: app
 spec:
   # serviceName provides DNS identity for pods (pod-0.service.ns.svc.cluster.local)
   # Consumers must provide a matching headless Service (clusterIP: None) with this name
-  serviceName: PLACEHOLDER_APP_NAME-bootstrap
+  serviceName: app-bootstrap
   replicas: 2
   revisionHistoryLimit: 3
   updateStrategy:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: PLACEHOLDER_APP_NAME
+      app: app
   template:
     metadata:
       labels:
-        app: PLACEHOLDER_APP_NAME
+        app: app
     spec:
-      serviceAccountName: PLACEHOLDER_SERVICE_ACCOUNT
+      serviceAccountName: app
       terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
@@ -28,11 +28,11 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: PLACEHOLDER_APP_NAME
-      imagePullSecrets:
-        - name: PLACEHOLDER_IMAGE_PULL_SECRET
+              app: app
+      # imagePullSecrets — add via patch if your registry requires auth
+      # See README "Image Pull Secrets" section for .env-driven pattern
       containers:
-        - name: PLACEHOLDER_APP_NAME
+        - name: app
           image: PLACEHOLDER_IMAGE
           imagePullPolicy: IfNotPresent
           ports:
