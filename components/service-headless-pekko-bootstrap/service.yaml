@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: PLACEHOLDER_APP_NAME-bootstrap
+  labels:
+    app: PLACEHOLDER_APP_NAME
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: PLACEHOLDER_APP_NAME
+  ports:
+    - name: remoting
+      port: 7355
+      targetPort: remoting
+      protocol: TCP
+    - name: management
+      port: 7626
+      targetPort: management
+      protocol: TCP
