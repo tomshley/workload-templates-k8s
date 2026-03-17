@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: PLACEHOLDER_APP_NAME
+  labels:
+    app: PLACEHOLDER_APP_NAME
+spec:
+  schedule: "0 0 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels:
+        app: PLACEHOLDER_APP_NAME
+    spec:
+      template:
+        metadata:
+          labels:
+            app: PLACEHOLDER_APP_NAME
+        spec:
+          serviceAccountName: PLACEHOLDER_SERVICE_ACCOUNT
+          restartPolicy: OnFailure
+          imagePullSecrets:
+            - name: PLACEHOLDER_IMAGE_PULL_SECRET
+          containers:
+            - name: PLACEHOLDER_APP_NAME
+              image: PLACEHOLDER_IMAGE
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: JAVA_TOOL_OPTIONS
+                  value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  memory: "2Gi"

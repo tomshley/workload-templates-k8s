@@ -1,0 +1,59 @@
+# Kustomize name reference configuration
+#
+# This file teaches Kustomize how to rewrite cross-resource references
+# when namePrefix, nameSuffix, or name transformers are applied.
+#
+# Without this, a namePrefix like "ingress-" would rename the ServiceAccount
+# but leave serviceAccountName in Deployments pointing to the old name.
+#
+# Usage:
+#   In your kustomization.yaml:
+#     configurations:
+#       - kustomizeconfig.yaml
+
+nameReference:
+  # ServiceAccount references
+  - kind: ServiceAccount
+    fieldSpecs:
+      - path: spec/template/spec/serviceAccountName
+        kind: Deployment
+      - path: spec/template/spec/serviceAccountName
+        kind: StatefulSet
+      - path: spec/jobTemplate/spec/template/spec/serviceAccountName
+        kind: CronJob
+
+  # Service references (StatefulSet serviceName for DNS identity)
+  - kind: Service
+    fieldSpecs:
+      - path: spec/serviceName
+        kind: StatefulSet
+
+  # Secret references (imagePullSecrets)
+  - kind: Secret
+    fieldSpecs:
+      - path: spec/template/spec/imagePullSecrets/name
+        kind: Deployment
+      - path: spec/template/spec/imagePullSecrets/name
+        kind: StatefulSet
+      - path: spec/jobTemplate/spec/template/spec/imagePullSecrets/name
+        kind: CronJob
+
+  # Role references (RoleBinding → Role)
+  - kind: Role
+    fieldSpecs:
+      - path: roleRef/name
+        kind: RoleBinding
+
+images:
+  - path: spec/template/spec/containers[]/image
+    kind: Deployment
+  - path: spec/template/spec/containers[]/image
+    kind: StatefulSet
+  - path: spec/template/spec/initContainers[]/image
+    kind: Deployment
+  - path: spec/template/spec/initContainers[]/image
+    kind: StatefulSet
+  - path: spec/jobTemplate/spec/template/spec/containers[]/image
+    kind: CronJob
+  - path: spec/jobTemplate/spec/template/spec/initContainers[]/image
+    kind: CronJob
