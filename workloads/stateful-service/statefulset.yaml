@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: PLACEHOLDER_APP_NAME
+  labels:
+    app: PLACEHOLDER_APP_NAME
+spec:
+  # serviceName provides DNS identity for pods (pod-0.service.ns.svc.cluster.local)
+  # Consumers must provide a matching headless Service (clusterIP: None) with this name
+  serviceName: PLACEHOLDER_APP_NAME-bootstrap
+  replicas: 2
+  revisionHistoryLimit: 3
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: PLACEHOLDER_APP_NAME
+  template:
+    metadata:
+      labels:
+        app: PLACEHOLDER_APP_NAME
+    spec:
+      serviceAccountName: PLACEHOLDER_SERVICE_ACCOUNT
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: PLACEHOLDER_APP_NAME
+      imagePullSecrets:
+        - name: PLACEHOLDER_IMAGE_PULL_SECRET
+      containers:
+        - name: PLACEHOLDER_APP_NAME
+          image: PLACEHOLDER_IMAGE
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]  # Longer grace period for stateful workloads
+          # Generic stateful template - no JVM-specific env (see pekko-cluster or deployment-http for JVM patterns)
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              memory: "2Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
