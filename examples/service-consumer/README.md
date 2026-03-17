@@ -16,7 +16,7 @@ Service repos reference templates via GitLab/GitHub URLs:
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.2
 ```
 
 **Pattern**: `{host}/{org}/{repo}//{path}?ref={version}`
@@ -40,23 +40,29 @@ namespace: your-platform-namespace
 
 ### 2. Name Prefix
 ```yaml
-namePrefix: your-service-name-
+namePrefix: egress-
 ```
 
 Prevents resource name collisions when multiple services share a namespace.
 
-### 3. Labels
+### 3. Identity Labels
 ```yaml
 labels:
   - pairs:
-      app.kubernetes.io/name: your-service-name
-      app.kubernetes.io/component: pekko-cluster  # or http, cronjob, stateful
-      app.kubernetes.io/part-of: your-platform
-      app.kubernetes.io/managed-by: kustomize
+      app: egress
     includeSelectors: true
 ```
 
-Enables platform-wide observability queries.
+Labels define identity. The `app` label is the canonical selector/routing label — it must be unique per deployment in the namespace.
+
+For Pekko clusters, add `actorSystemName` in a **separate** block to avoid coupling it to selectors:
+
+```yaml
+  - pairs:
+      actorSystemName: egress
+    includeSelectors: false
+    includeTemplates: true
+```
 
 ### 4. Image Substitution
 ```yaml
@@ -78,7 +84,7 @@ patches:
   - path: patches/deployment-env.yaml
     target:
       kind: Deployment
-      name: PLACEHOLDER_APP_NAME
+      name: app
 ```
 
 `patches/deployment-env.yaml`:
@@ -166,12 +172,12 @@ kustomize build examples/service-consumer | kubectl apply -f -
 
 ### Staging
 ```yaml
-?ref=v1.0.0  # Pin to specific release
+?ref=v0.0.2  # Pin to specific release
 ```
 
 ### Production
 ```yaml
-?ref=v1.0.0  # Always pin to tested version
+?ref=v0.0.2  # Always pin to tested version
 ```
 
 Update production pins only after staging validation.
