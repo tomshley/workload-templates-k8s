@@ -29,15 +29,15 @@ namePrefix: egress-
 
 # Fetch kustomizeconfig.yaml for safe name + label transformations
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.0.3
 
 # Remote template references (GitLab URL format)
 # Pattern: gitlab.com/{org}/{repo}//{path}?ref={version}
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.2
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.0.2
-  - https://gitlab.com/your-org/workload-templates-k8s//components/pdb?ref=v0.0.2
-  - https://gitlab.com/your-org/workload-templates-k8s//components/service-headless-pekko-bootstrap?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.3
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.0.3
+  - https://gitlab.com/your-org/workload-templates-k8s//components/pdb?ref=v0.0.3
+  - https://gitlab.com/your-org/workload-templates-k8s//components/service-headless-pekko-bootstrap?ref=v0.0.3
   # Note: DNS bootstrap via headless service. For K8s API bootstrap, use rbac-pod-reader instead.
 
 # Identity labels — `app` is the canonical selector/routing label
