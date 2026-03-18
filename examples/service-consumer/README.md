@@ -16,7 +16,7 @@ Service repos reference templates via GitLab/GitHub URLs:
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.2
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.3
 ```
 
 **Pattern**: `{host}/{org}/{repo}//{path}?ref={version}`
@@ -172,12 +172,12 @@ kustomize build examples/service-consumer | kubectl apply -f -
 
 ### Staging
 ```yaml
-?ref=v0.0.2  # Pin to specific release
+?ref=v0.0.3  # Pin to specific release
 ```
 
 ### Production
 ```yaml
-?ref=v0.0.2  # Always pin to tested version
+?ref=v0.0.3  # Always pin to tested version
 ```
 
 Update production pins only after staging validation.
