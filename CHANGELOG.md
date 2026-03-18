@@ -6,6 +6,15 @@ This project follows Semantic Versioning.
 
 ---
 
+## [0.0.3] - 2026-03-17
+
+### Fixed
+
+- **kustomizeconfig.yaml: `commonLabels` → `labels` section key** — Changed label fieldSpecs section key from `commonLabels:` to `labels:` to fix "conflicting fieldspecs" error when consumers use the Kustomize v5.x `labels:` transformer. The `commonLabels:` key conflicted with the newer transformer API. Requires Kustomize v5.4.0+. Older versions can revert to `commonLabels:` (commented in file).
+- **kustomizeconfig.yaml: removed redundant `images` fieldSpecs** — The `images:` section duplicated Kustomize v5.x built-in defaults for Deployment, StatefulSet, and CronJob container/initContainer paths, causing "conflicting fieldspecs" when loaded via `configurations:`. Removed active declarations; commented-out block retained for Kustomize < v5.0.0 users.
+
+---
+
 ## [0.0.2] - 2026-03-17
 
 ### Added
@@ -54,7 +63,7 @@ This project follows Semantic Versioning.
 
 - **Label-driven identity model** — Service identity is driven by consumer-defined `app` label via Kustomize's `labels` transformer with `includeSelectors: true`, not by resource names. Templates use short default name `app` that `namePrefix` transforms into clean resource names. `PLACEHOLDER_IMAGE` is the only remaining placeholder (works natively with Kustomize `images:` transformer).
 - **APP_LABEL via Downward API** — `APP_LABEL` env var in pekko-cluster uses `fieldRef: metadata.labels['app']` instead of a hardcoded value, eliminating identity drift at runtime.
-- **topologySpreadConstraints label propagation** — `kustomizeconfig.yaml` has `commonLabels` fieldSpecs for `topologySpreadConstraints/labelSelector/matchLabels` on Deployment and StatefulSet. Without this, consumer labels do not propagate to topology spread constraints (not in Kustomize's default label injection paths).
+- **topologySpreadConstraints label propagation** — `kustomizeconfig.yaml` has `labels` fieldSpecs for `topologySpreadConstraints/labelSelector/matchLabels` on Deployment and StatefulSet. Without this, consumer labels do not propagate to topology spread constraints (not in Kustomize's default label injection paths).
 - **actorSystemName isolation** — Pekko cluster `actorSystemName` label kept in separate labels block with `includeSelectors: false` to avoid coupling discovery label to Service/PDB selectors.
 - **imagePullSecrets pattern** — Templates omit `imagePullSecrets` by default. Consumers add via strategic merge patch. See `examples/image-pull-secret/` for the pattern.
 - **managed-by label selector decoupling** — `app.kubernetes.io/managed-by: kustomize` label uses `includeSelectors: false` / `includeTemplates: true` to keep it out of immutable selectors while preserving observability on pod templates. This avoids forward-compatibility issues if the label changes in future template versions.
