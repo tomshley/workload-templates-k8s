@@ -85,8 +85,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.0.3
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.0.3
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.1.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.1.0
 ```
 
 Benefits:
@@ -99,7 +99,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.0.3
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.1.0
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
@@ -114,7 +114,7 @@ This ensures cross-resource references (ServiceAccount, Service, Secret, Role) a
 
 > **Labels define identity. Names are cosmetic.**
 
-Templates use short default names (`app`) that Kustomize's `namePrefix` transforms into clean, production-ready resource names. Service identity is driven by **labels**, not resource names.
+Templates use hyphen-prefixed default names (`-app`, `-kafka-credentials`, etc.) that Kustomize's `namePrefix` transforms into clean, production-ready resource names (e.g. `egress-app`). The leading hyphen acts as a **guard rail** — if a consumer forgets to set `namePrefix`, the resulting resource names (e.g. `-app`) will fail validation, making the omission obvious. Consumer `namePrefix` values should **not** include a trailing hyphen; the template's leading hyphen provides the separator. Service identity is driven by **labels**, not resource names.
 
 ### How It Works
 
@@ -175,7 +175,7 @@ Override via Kustomize patches in your service overlay:
 patches:
   - target:
       kind: Deployment
-      name: app
+      name: -app
     patch: |-
       - op: replace
         path: /spec/replicas
@@ -217,7 +217,7 @@ patches:
   - path: patches/deployment-image-pull-secret.yaml
     target:
       kind: Deployment
-      name: app
+      name: -app
 ```
 
 ```yaml
@@ -225,7 +225,7 @@ patches:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app
+  name: -app
 spec:
   template:
     spec:
