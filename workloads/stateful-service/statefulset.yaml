@@ -1,13 +1,13 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: app
+  name: -app
   labels:
     app: app
 spec:
   # serviceName provides DNS identity for pods (pod-0.service.ns.svc.cluster.local)
   # Consumers must provide a matching headless Service (clusterIP: None) with this name
-  serviceName: app-bootstrap
+  serviceName: -app-bootstrap
   replicas: 2
   revisionHistoryLimit: 3
   updateStrategy:
@@ -20,7 +20,7 @@ spec:
       labels:
         app: app
     spec:
-      serviceAccountName: app
+      serviceAccountName: -app
       terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
