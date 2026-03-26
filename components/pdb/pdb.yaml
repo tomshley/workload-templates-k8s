@@ -1,7 +1,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: app
+  name: -app
   labels:
     app: app
 spec:

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app
+  name: -app
   labels:
     app: app
 spec:
@@ -21,7 +21,7 @@ spec:
       labels:
         app: app
     spec:
-      serviceAccountName: app
+      serviceAccountName: -app
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
