@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: app
+  name: -app
   labels:
     app: app
 spec:
@@ -17,7 +17,7 @@ spec:
           labels:
             app: app
         spec:
-          serviceAccountName: app
+          serviceAccountName: -app
           restartPolicy: OnFailure
           # imagePullSecrets — add via patch if your registry requires auth
           # See README "Image Pull Secrets" section for .env-driven pattern
