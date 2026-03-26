@@ -24,7 +24,7 @@ kind: Kustomization
 namespace: my-platform
 
 # Prefix all resource names to avoid collisions in shared namespaces
-# Result: metadata.name becomes "egressapp", "egressapp-bootstrap", etc.
+# Result: metadata.name becomes "egress-app", "egress-app-bootstrap", etc.
 namePrefix: egress
 
 # Fetch kustomizeconfig.yaml for safe name + label transformations
