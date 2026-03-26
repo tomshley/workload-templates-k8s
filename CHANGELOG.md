@@ -6,6 +6,35 @@ This project follows Semantic Versioning.
 
 ---
 
+## [0.1.0] - 2026-03-26
+
+### Added
+
+- **Connection components (5)** - Reusable components for common service connections
+  - `connection-kafka` - Kafka connection with SASL credentials and config
+  - `connection-postgres` - PostgreSQL connection with database config and credentials  
+  - `connection-rds-cert` - RDS CA certificate bundle for TLS connections
+  - `connection-s3` - S3 connection with bucket configuration
+  - `credentials-registry` - GitLab container registry credentials
+
+- **Component structure** - Each connection component includes:
+  - `.env.example` files for local development reference
+  - Secret and ConfigMap templates with PLACEHOLDER values
+  - Kustomization configuration for easy consumption
+
+### Changed
+
+- **README.md** - Updated documentation to reflect new connection components
+- **VERSION** - Bumped to 0.1.0
+
+- **kustomizeconfig.yaml** - Added volume secret name transformation for Deployment, StatefulSet, and CronJob to support RDS certificate mounting
+
+- **Component naming consistency** - Updated resource names across components for better alignment with dash-prefix naming convention
+
+- **Service examples** - Updated pekko-cluster bootstrap examples to include new connection components as resources
+
+---
+
 ## [0.0.3] - 2026-03-17
 
 ### Fixed
