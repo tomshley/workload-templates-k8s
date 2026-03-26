@@ -37,6 +37,30 @@ nameReference:
         kind: StatefulSet
       - path: spec/jobTemplate/spec/template/spec/imagePullSecrets/name
         kind: CronJob
+      # Secret references in volume mounts (connection components)
+      - path: spec/template/spec/volumes/secret/secretName
+        kind: Deployment
+      - path: spec/template/spec/volumes/secret/secretName
+        kind: StatefulSet
+      - path: spec/jobTemplate/spec/template/spec/volumes/secret/secretName
+        kind: CronJob
+      # Secret references in env var secretKeyRef (connection components)
+      - path: spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+        kind: Deployment
+      - path: spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+        kind: StatefulSet
+      - path: spec/jobTemplate/spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+        kind: CronJob
+
+  # ConfigMap references in env var configMapKeyRef (connection components)
+  - kind: ConfigMap
+    fieldSpecs:
+      - path: spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+        kind: Deployment
+      - path: spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+        kind: StatefulSet
+      - path: spec/jobTemplate/spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+        kind: CronJob
 
   # Role references (RoleBinding → Role)
   - kind: Role

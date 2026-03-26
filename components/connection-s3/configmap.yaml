@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: -s3-config
+data:
+  bucket-name: "PLACEHOLDER"
+  region: "us-east-1"
