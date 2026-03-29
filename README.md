@@ -54,6 +54,8 @@ workloads/
   stateful-service/       — Generic StatefulSet template
 
 components/
+  hpa/                    — HorizontalPodAutoscaler
+  karpenter-nodepool/     — Karpenter NodePool + EC2NodeClass (AWS)
   pdb/                    — PodDisruptionBudget
   rbac-pod-reader/        — RBAC Role + RoleBinding for pod discovery
   service-headless-pekko-bootstrap/ — Headless Service for Pekko cluster bootstrapping
@@ -64,6 +66,7 @@ examples/
   image-pull-secret/                      — imagePullSecrets patch pattern
   pekko-cluster-dns-bootstrap/            — DNS-based Pekko Cluster bootstrap
   pekko-cluster-kubernetes-api-bootstrap/ — Kubernetes API-based Pekko Cluster bootstrap
+  scaling-hpa-karpenter/                  — HPA + Karpenter NodePool autoscaling (AWS)
   service-consumer/                       — Remote consumption patterns
 
 assets/
@@ -270,6 +273,72 @@ The `pdb` component sets `maxUnavailable: 1`, which is safe with the default 3 r
 - Surviving pod has no quorum → SBR shuts it down → **complete cluster outage**
 
 If you need 2 replicas, override the PDB to `maxUnavailable: 0` (blocks voluntary disruptions) or use a different SBR strategy.
+
+### Single-Replica Clusters (Staging / Development)
+
+Running 1 replica is safe for staging and development environments:
+
+- SBR is irrelevant — a single-node cluster has no partitions to resolve
+- `REQUIRED_CONTACT_POINT_NR=1` (the template default) allows a single pod to form a cluster
+- PDB `maxUnavailable: 1` blocks voluntary evictions, preventing accidental scale-to-zero
+- Pekko Cluster Bootstrap discovers zero peers and self-joins after the contact point timeout
+
+Override replicas via the Kustomize `replicas` transformer in your staging overlay:
+
+```yaml
+replicas:
+  - name: my-service-app
+    count: 1
+```
+
+### HPA and Replica Management
+
+The `hpa` component provides a `HorizontalPodAutoscaler` that scales the Deployment based on CPU utilization. When HPA manages replicas:
+
+- **Do not set a static `replicas` field** on the Deployment — HPA becomes the source of truth
+- Remove any `deployment-replicas.yaml` patch or `replicas` transformer from overlays where HPA is active
+- Consumer overlays patch `minReplicas` / `maxReplicas` per environment
+- For Pekko Cluster with `keep-majority`, production `minReplicas` must be **≥ 3** (odd)
+- Staging can use `minReplicas: 1` (single-node cluster, SBR irrelevant)
+
+The `kustomizeconfig.yaml` nameReference ensures `scaleTargetRef.name` is automatically rewritten when `namePrefix` is applied.
+
+### Karpenter NodePool + EC2NodeClass (AWS)
+
+The `karpenter-nodepool` component provides a `NodePool` and `EC2NodeClass` for just-in-time node provisioning on AWS EKS. When HPA scales pods beyond cluster capacity, Karpenter provisions new EC2 instances matching the NodePool constraints.
+
+**Prerequisites:**
+- Karpenter controller installed in the cluster (via Terraform/Helm)
+- IAM roles for controller (IRSA) and node instances
+- Discovery tags on VPC subnets and security groups: `karpenter.sh/discovery: <cluster-name>`
+- EKS access entry for the Karpenter node role (type: `EC2_LINUX`)
+
+**Required patches:** The EC2NodeClass template uses PLACEHOLDERs that must be replaced per environment:
+
+```yaml
+# In your environment overlay
+patches:
+  - path: patches/ec2nodeclass-env.yaml
+    target:
+      group: karpenter.k8s.aws
+      version: v1
+      kind: EC2NodeClass
+      name: my-service-default  # namePrefix + "-default"
+```
+
+Where `patches/ec2nodeclass-env.yaml` replaces `PLACEHOLDER_KARPENTER_NODE_ROLE` and `PLACEHOLDER_CLUSTER_NAME` with real values from your infrastructure outputs.
+
+See `examples/scaling-hpa-karpenter/` for the complete pattern including HPA + Karpenter composition.
+
+The `kustomizeconfig.yaml` nameReference ensures `nodeClassRef.name` in the NodePool is automatically rewritten when `namePrefix` is applied.
+
+### Scaling from 1 → 3 Replicas
+
+When scaling a single-replica Pekko cluster to 3 (e.g. promoting staging configuration to production):
+
+- New pods join the existing cluster automatically via Pekko Cluster Bootstrap
+- Cluster Sharding rebalances shards across the new members
+- No manual seed node configuration required — the Kubernetes API or DNS discovery handles formation
 
 ### CPU Limits
 
