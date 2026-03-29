@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Example: HPA + Karpenter NodePool scaling for a Pekko Cluster workload
+#
+# This example shows:
+# - HorizontalPodAutoscaler targeting a Deployment (CPU-based autoscaling)
+# - Karpenter NodePool + EC2NodeClass for just-in-time node provisioning (AWS)
+# - namePrefix rewriting for HPA scaleTargetRef and NodePool nodeClassRef
+# - Environment-specific patching pattern for EC2NodeClass PLACEHOLDERs
+#
+# Consumers MUST patch the EC2NodeClass PLACEHOLDERs in their environment overlays:
+#   - PLACEHOLDER_KARPENTER_NODE_ROLE  → IAM role name for Karpenter-provisioned nodes
+#   - PLACEHOLDER_CLUSTER_NAME         → EKS cluster name (for subnet/SG discovery tags)
+
+configurations:
+  - ../../kustomizeconfig.yaml
+
+namePrefix: my-service
+
+resources:
+  - ../../workloads/pekko-cluster
+  - ../../components/rbac-pod-reader
+  - ../../components/serviceaccount
+  - ../../components/pdb
+  - ../../components/hpa
+  - ../../components/karpenter-nodepool
+
+labels:
+  - pairs:
+      app: my-service
+    includeSelectors: true
+
+images:
+  - name: PLACEHOLDER_IMAGE
+    newName: registry.example.com/my-org/my-service
+    newTag: "1.0.0"
+
+# Patch EC2NodeClass PLACEHOLDERs with environment-specific values
+# In a real service, these patches live in the environment overlay (staging/prod)
+patches:
+  - path: patches/ec2nodeclass-env.yaml
+    target:
+      group: karpenter.k8s.aws
+      version: v1
+      kind: EC2NodeClass
+      name: -default
