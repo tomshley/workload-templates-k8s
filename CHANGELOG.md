@@ -6,6 +6,27 @@ This project follows Semantic Versioning.
 
 ---
 
+## [0.1.1] - 2026-03-29
+
+### Added
+
+- **Autoscaling components (2)** - HorizontalPodAutoscaler and Karpenter nodepool components
+  - `hpa` - HorizontalPodAutoscaler templates for pod-level autoscaling
+  - `karpenter-nodepool` - Karpenter EC2NodeClass and NodePool templates for dynamic node provisioning
+
+- **Scaling example** - Complete example demonstrating HPA + Karpenter integration
+  - `examples/scaling-hpa-karpenter/` - End-to-end scaling configuration
+  - Environment-specific patches for EC2NodeClass configuration
+
+- **Enhanced kustomizeconfig** - Improved component composition support
+
+### Changed
+
+- **pekko-cluster example** - Updated to reference new autoscaling components
+- **README.md** - Updated documentation for new autoscaling capabilities
+
+---
+
 ## [0.1.0] - 2026-03-26
 
 ### Added
