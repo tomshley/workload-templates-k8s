@@ -8,3 +8,4 @@ resources:
   - ../../components/rbac-pod-reader
   - ../../components/serviceaccount
   - ../../components/pdb
+  - ../../components/hpa
