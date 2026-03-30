@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: -app-nlb
+  labels:
+    app: app
+  annotations:
+    # AWS Network Load Balancer (NLB) with TLS termination
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    # ACM certificate ARN (placeholder - override per environment)
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "PLACEHOLDER_ACM_CERT_ARN"
+    # TLS termination on specified port
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "8443"
+    # NLB is Layer 4 — backend is always plain TCP (no backend-protocol annotation needed)
+spec:
+  type: LoadBalancer
+  selector:
+    app: app
+  ports:
+    - name: tcp
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
