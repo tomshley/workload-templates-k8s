@@ -62,6 +62,18 @@ nameReference:
       - path: spec/jobTemplate/spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
         kind: CronJob
 
+  # Deployment references (HPA → Deployment)
+  - kind: Deployment
+    fieldSpecs:
+      - path: spec/scaleTargetRef/name
+        kind: HorizontalPodAutoscaler
+
+  # EC2NodeClass references (NodePool → EC2NodeClass)
+  - kind: EC2NodeClass
+    fieldSpecs:
+      - path: spec/template/spec/nodeClassRef/name
+        kind: NodePool
+
   # Role references (RoleBinding → Role)
   - kind: Role
     fieldSpecs:
