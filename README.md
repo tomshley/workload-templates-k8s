@@ -54,11 +54,17 @@ workloads/
   stateful-service/       — Generic StatefulSet template
 
 components/
+  connection-kafka/         — Kafka connection Secret
+  connection-postgres/     — PostgreSQL connection Secret/ConfigMap
+  connection-rds-cert/     — AWS RDS SSL certificate Secret
+  connection-s3/           — S3 connection ConfigMap
+  credentials-registry/    — Container registry credentials Secret
   hpa/                    — HorizontalPodAutoscaler
   karpenter-nodepool/     — Karpenter NodePool + EC2NodeClass (AWS)
   pdb/                    — PodDisruptionBudget
   rbac-pod-reader/        — RBAC Role + RoleBinding for pod discovery
   service-headless-pekko-bootstrap/ — Headless Service for Pekko cluster bootstrapping
+  service-nlb-tcp/        — AWS NLB TCP Service with TLS termination
   service-public-http/    — Public-facing HTTP Service
   serviceaccount/         — ServiceAccount
 
@@ -144,7 +150,7 @@ The `app` label **must be unique per deployment** in a namespace. Two services w
 
 ### `PLACEHOLDER_IMAGE`
 
-`PLACEHOLDER_IMAGE` is the only remaining placeholder. It works natively with Kustomize's `images` transformer:
+`PLACEHOLDER_IMAGE` is the only placeholder that uses Kustomize's `images` transformer. Other components use annotation- or data-level `PLACEHOLDER_*` values that consumers override via patches.
 
 ```yaml
 images:

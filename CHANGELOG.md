@@ -18,12 +18,15 @@ This project follows Semantic Versioning.
   - `examples/scaling-hpa-karpenter/` - End-to-end scaling configuration
   - Environment-specific patches for EC2NodeClass configuration
 
+- **Network load balancer component** - AWS NLB TCP Service with TLS termination
+  - `service-nlb-tcp` - Internet-facing NLB template with ACM certificate placeholder
+
 - **Enhanced kustomizeconfig** - Improved component composition support
 
 ### Changed
 
 - **pekko-cluster example** - Updated to reference new autoscaling components
-- **README.md** - Updated documentation for new autoscaling capabilities
+- **README.md** - Updated project structure to include connection components (from 0.1.0) and new components
 
 ---
 
