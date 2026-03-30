@@ -6,6 +6,23 @@ This project follows Semantic Versioning.
 
 ---
 
+## [0.2.0] - 2026-03-29
+
+### Added
+
+- **Network load balancer component** - AWS NLB TCP Service with TLS termination
+  - `service-nlb-tcp` - Internet-facing NLB template with ACM certificate placeholder
+  - TLS termination on specified port with backend TCP communication
+  - Follows label-driven identity model and dash-prefix naming convention
+
+### Changed
+
+- **README.md** - Updated project structure to include service-nlb-tcp component
+- **PLACEHOLDER_IMAGE documentation** - Clarified distinction between images transformer placeholders and patch-level placeholders
+- **kustomizeconfig.yaml** - Added comment about Service-to-Service references (DNS-based, no nameReference needed)
+
+---
+
 ## [0.1.1] - 2026-03-29
 
 ### Added
