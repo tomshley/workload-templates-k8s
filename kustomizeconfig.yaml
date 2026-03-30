@@ -80,6 +80,9 @@ nameReference:
       - path: roleRef/name
         kind: RoleBinding
 
+  # Service-to-Service references: Services are typically referenced by DNS, not by name,
+  # so no additional nameReference entry is needed beyond the StatefulSet serviceName above.
+
 # Label fieldSpecs — extend labels transformer to non-default paths
 # topologySpreadConstraints labelSelector is NOT in Kustomize's default label injection paths.
 # Without this, consumer labels won't propagate to topology spread, breaking pod distribution.
