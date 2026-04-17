@@ -8,6 +8,11 @@ metadata:
     # AWS Network Load Balancer (NLB) with TLS termination
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    # Cross-zone load balancing — ensures traffic reaches targets regardless of
+    # which AZ the NLB node receives the connection.  Without this, single-replica
+    # deployments have a high probability of connection reset when the client
+    # resolves to an NLB node in an AZ with no registered targets.
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
     # ACM certificate ARN (placeholder - override per environment)
     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "PLACEHOLDER_ACM_CERT_ARN"
     # TLS termination on specified port
