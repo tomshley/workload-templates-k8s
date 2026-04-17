@@ -6,6 +6,14 @@ This project follows Semantic Versioning.
 
 ---
 
+## [0.2.2] - 2026-04-17
+
+### Fixed
+
+- **service-nlb-tcp: enable cross-zone load balancing** — Added `aws-load-balancer-cross-zone-load-balancing-enabled: "true"` annotation. Without cross-zone, single-replica deployments experience connection resets when clients resolve to an NLB node in an AZ with no registered targets. NLB completes the TCP handshake itself regardless of backend availability, then sends RST when no local target exists.
+
+---
+
 ## [0.2.0] - 2026-03-29
 
 ### Added
