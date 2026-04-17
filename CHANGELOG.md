@@ -6,7 +6,7 @@ This project follows Semantic Versioning.
 
 ---
 
-## [0.2.2] - 2026-04-17
+## [0.3.0] - 2026-04-17
 
 ### Fixed
 

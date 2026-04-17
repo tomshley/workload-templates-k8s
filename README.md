@@ -94,8 +94,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.2.2
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.2.2
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.3.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.3.0
 ```
 
 Benefits:
@@ -108,7 +108,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.2.2
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.3.0
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
