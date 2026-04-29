@@ -73,7 +73,7 @@ This project follows Semantic Versioning.
   ```
 
 - **Existing consumers of `workloads/stateful-service`** — the readinessProbe path is unchanged (`/ready`); only liveness and startup move off `/healthz`. The template now references two probe paths (`/alive` and `/ready`); `/healthz` is no longer probed. Choose one of:
-  - **(a)** add an `/alive` route that returns 200 for a running process. The existing `/ready` route (already used by readinessProbe) is now also used by startupProbe, so no other route is required. `/healthz` can be deleted or left in place as an internal alias — the template no longer references it.
+  - **(a)** add an `/alive` route that returns 200 for a running process. The existing `/ready` route (already used by readinessProbe) is now also used by startupProbe, so `/alive` is the only new route required. `/healthz` can be deleted or left in place as an internal alias — the template no longer references it.
   - **(b)** keep `/healthz` and patch the probe `path:` fields back in your overlay. This only adjusts liveness and startup; the readinessProbe still points at `/ready`:
 
     ```yaml
