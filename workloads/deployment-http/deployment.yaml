@@ -50,7 +50,7 @@ spec:
           # `workloads/pekko-cluster` instead, which bundles JVM heap tuning, the
           # remoting + management ports, and cluster-leave lifecycle defaults.
           #
-          # Probe paths follow the convention shared with `tomshley/boilerplate-jvm`:
+          # Probe paths follow the convention from Pekko Management's `HealthCheckRoutes`:
           #   /alive  — liveness (process is alive); always-200 for a running pod
           #   /ready  — readiness (dependencies are ready); 200 only when the pod
           #             can accept traffic
