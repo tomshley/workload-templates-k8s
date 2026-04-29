@@ -192,7 +192,7 @@ The `pekko-cluster` template exposes `APP_LABEL` as an env var for Pekko's conta
 
 ## Resource Customization
 
-Template resource defaults (`cpu: 500m`, `memory: 1Gi` / `2Gi` and a `startupProbe.failureThreshold` window of 120–150s) are sized for JVM-class workloads. Lower-footprint runtimes (Python, Go, Node) typically tighten both the resource floor and the startup-probe window in their overlay. Consumers should adjust based on workload characteristics:
+Template resource defaults — `cpu: 500m`, `memory: 1Gi` / `2Gi` across all four workloads and a `startupProbe.failureThreshold` window of 120–150s on the three HTTP-serving workloads — are sized for JVM-class services. Lower-footprint runtimes (Python, Go, Node) typically tighten both the resource floor and (where applicable) the startup-probe window in their overlay. Consumers should adjust based on workload characteristics:
 
 - **replicas** — Scale for availability and throughput requirements
 - **CPU requests** — Size for steady-state processing needs  
