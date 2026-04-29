@@ -6,6 +6,57 @@ This project follows Semantic Versioning.
 
 ---
 
+## [Unreleased]
+
+### Changed (BREAKING)
+
+- **`workloads/deployment-http`** — runtime-neutral cleanup so the workload matches its name (a stateless HTTP Deployment, not a JVM HTTP Deployment). Pekko Cluster services should consume `workloads/pekko-cluster`, which continues to bundle JVM heap tuning, the remoting + management ports, and cluster-leave lifecycle defaults.
+  - **Removed `JAVA_TOOL_OPTIONS` env var.** JVM consumers add it back via a deployment-env patch in their overlay; non-JVM consumers no longer ship an unused env var.
+  - **Removed `management` port at containerPort 7626.** Pekko Management is a Pekko-specific concept and belongs in `workloads/pekko-cluster` (which retains it). Consumers without Pekko Management run a single-port pod by default.
+  - **Retargeted all probes (`startupProbe`, `readinessProbe`, `livenessProbe`) to the `http` port** — the management port no longer exists on this workload. Probe paths (`/alive` for liveness, `/ready` for readiness/startup) are unchanged; their semantics are runtime-neutral and align with the convention exposed by `tomshley/boilerplate-jvm` (Pekko Management) and downstream service libraries that follow the same convention.
+- **`workloads/cron-job`** — runtime-neutral cleanup matching `deployment-http`. Removed the `JAVA_TOOL_OPTIONS` env var so the template is no longer JVM-flavoured by default; JVM consumers add it back via a strategic-merge patch in their overlay. Non-JVM consumers no longer carry an unused env var.
+- **`workloads/stateful-service`** — probe paths aligned to the repo-wide `/alive` + `/ready` convention:
+  - `livenessProbe.httpGet.path`: `/healthz` → `/alive`
+  - `startupProbe.httpGet.path`: `/healthz` → `/ready`
+  - `readinessProbe.httpGet.path`: unchanged (`/ready`)
+  Consumers that served `/healthz` from their HTTP handler either (a) rename the route to `/alive`, or (b) patch the probe `path:` fields back to `/healthz` in their overlay. The path names are the only contract touched; ports (`http`) and timing (`periodSeconds`, `failureThreshold`) are unchanged.
+
+### Migration notes
+
+- **Pekko Cluster consumers** (`workloads/pekko-cluster`) — unaffected. `pekko-cluster` continues to expose the `management` port (7626), `JAVA_TOOL_OPTIONS`, remoting, and Pekko-Cluster-specific lifecycle defaults.
+- **Non-clustered JVM consumers** of `workloads/deployment-http` — add the following strategic-merge patch to your overlay if you previously relied on the JVM heap-percentage tuning:
+
+  ```yaml
+  patches:
+    - target:
+        kind: Deployment
+        name: -app
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: -app
+        spec:
+          template:
+            spec:
+              containers:
+                - name: app
+                  env:
+                    - name: JAVA_TOOL_OPTIONS
+                      value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
+  ```
+
+  Strategic merge uses `name` as the merge key on the `env` list, so this patch **adds** `JAVA_TOOL_OPTIONS` without clobbering any other env-injecting patch in your overlay (DB credentials, runtime config, etc.). A JSON 6902 `op: add` on `/spec/template/spec/containers/0/env` would instead **replace** the entire list — silently dropping every other env var — whenever the field already exists; prefer the strategic-merge form above.
+
+  If you also relied on Pekko Management on port 7626 without consuming `pekko-cluster`, either migrate to `pekko-cluster` (recommended) or layer a deployment-ports patch + probe-port patch to restore the prior shape.
+- **Python / Go consumers** — your overlay simplifies. Remove any prior patches that stripped `JAVA_TOOL_OPTIONS`, deleted the `management` port, or rerouted probes to `port: http`; the template now defaults to that shape.
+
+### Changed
+
+- **`workloads/stateful-service/statefulset.yaml`** — comment updated to point to `pekko-cluster` for JVM/Pekko patterns (was previously cross-referencing `deployment-http`, which no longer carries JVM defaults).
+
+---
+
 ## [0.3.0] - 2026-04-17
 
 ### Fixed
