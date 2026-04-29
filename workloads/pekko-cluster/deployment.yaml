@@ -62,6 +62,12 @@ spec:
               value: "1"
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
+          # Probe paths follow the convention shared with `tomshley/boilerplate-jvm`:
+          #   /alive  — liveness (process is alive); always-200 for a running pod
+          #   /ready  — readiness (dependencies are ready); 200 only when the pod
+          #             can accept traffic
+          # Probes target the `management` port (Pekko Management's 7626) — separate
+          # from the application data plane and from the cluster remoting port.
           startupProbe:
             httpGet:
               path: /ready
