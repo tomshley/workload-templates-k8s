@@ -13,9 +13,9 @@ This project follows Semantic Versioning.
 - **`workloads/deployment-http`** — runtime-neutral cleanup so the workload matches its name (a stateless HTTP Deployment, not a JVM HTTP Deployment). Pekko Cluster services should consume `workloads/pekko-cluster`, which continues to bundle JVM heap tuning, the remoting + management ports, and cluster-leave lifecycle defaults.
   - **Removed `JAVA_TOOL_OPTIONS` env var.** JVM consumers add it back via a strategic-merge patch in their overlay; non-JVM consumers no longer ship an unused env var.
   - **Removed `management` port at containerPort 7626.** Pekko Management is a Pekko-specific concept and belongs in `workloads/pekko-cluster` (which retains it). Consumers without Pekko Management run a single-port pod by default.
-  - **Retargeted all probes (`startupProbe`, `readinessProbe`, `livenessProbe`) to the `http` port** — the management port no longer exists on this workload. Probe paths (`/alive` for liveness, `/ready` for readiness/startup) are unchanged; their semantics align with the convention used by `tomshley/boilerplate-jvm` (Pekko Management) and any other HTTP service that exposes the same two routes.
+  - **Retargeted all probes (`startupProbe`, `readinessProbe`, `livenessProbe`) to the `http` port** — the management port no longer exists on this workload. Probe paths (`/alive` for liveness, `/ready` for readiness/startup) are unchanged; their semantics follow the convention from Pekko Management's `HealthCheckRoutes`.
 - **`workloads/cron-job`** — runtime-neutral cleanup matching `deployment-http`. Removed the `JAVA_TOOL_OPTIONS` env var so the template is no longer JVM-specific by default; JVM consumers add it back via a strategic-merge patch in their overlay. Non-JVM consumers no longer carry an unused env var.
-- **`workloads/stateful-service`** — probe paths aligned to the repo-wide `/alive` + `/ready` convention. Only the path names change; ports (`http`) and timing (`periodSeconds`, `failureThreshold`) are unchanged. Consumers that served `/healthz` from their HTTP handler either (a) rename the route to `/alive`, or (b) patch the probe `path:` fields back to `/healthz` in their overlay (see migration notes below).
+- **`workloads/stateful-service`** — probe paths aligned to the repo-wide `/alive` + `/ready` convention. Only the path names change; ports (`http`) and timing (`periodSeconds`, `failureThreshold`) are unchanged. The readinessProbe path is unchanged; only liveness and startup move off `/healthz`. Existing consumers either (a) add an `/alive` route to their HTTP handler (the existing `/ready` is now wired to both readinessProbe and startupProbe), or (b) patch the probe `path:` fields back to `/healthz` in their overlay (see migration notes below).
   - `livenessProbe.httpGet.path`: `/healthz` → `/alive`
   - `startupProbe.httpGet.path`: `/healthz` → `/ready`
   - `readinessProbe.httpGet.path`: unchanged (`/ready`)
@@ -72,9 +72,9 @@ This project follows Semantic Versioning.
                           value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
   ```
 
-- **Existing consumers of `workloads/stateful-service`** — if your application served `/healthz` (the prior template default) for liveness and startup, either:
-  - **(a)** rename the route to `/alive` so it matches the new repo-wide convention shared with `deployment-http` and `pekko-cluster`; or
-  - **(b)** patch the probe `path:` fields back to `/healthz` in your overlay:
+- **Existing consumers of `workloads/stateful-service`** — the readinessProbe path is unchanged (`/ready`); only liveness and startup move off `/healthz`. The new layout has three distinct paths (`/alive`, `/ready`, and an unused-by-the-template `/healthz`), so a simple route rename is not enough. Choose one of:
+  - **(a)** add an `/alive` HTTP route to your handler that always returns 200 for a running process. Your existing `/ready` route (already wired to readinessProbe in the prior template) is now also wired to startupProbe, so no second new route is required. `/healthz` can be deleted or kept as an internal alias — the template no longer references it; or
+  - **(b)** keep `/healthz` and patch the probe `path:` fields back to `/healthz` in your overlay (note that this only adjusts liveness and startup; the readinessProbe still points at `/ready`):
 
     ```yaml
     patches:
