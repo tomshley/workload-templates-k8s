@@ -50,7 +50,7 @@ Workloads compose components. Examples show how workloads and components combine
 
 `stateful-service` is a **runtime-neutral** StatefulSet with a longer preStop grace period and Downward-API pod-identity env (`POD_NAME`, `POD_NAMESPACE`). Probes follow the repo-wide `/alive` + `/ready` convention.
 
-`cron-job` is a **runtime-neutral** CronJob template with `concurrencyPolicy: Forbid`. JVM consumers add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay.
+`cron-job` is a **runtime-neutral** CronJob template with `concurrencyPolicy: Forbid`. JVM consumers add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay (see [`CHANGELOG.md`](./CHANGELOG.md) for the patch recipe; note the deeper `spec.jobTemplate.spec.template.spec.containers` path that `CronJob` requires).
 
 ### Probe Convention
 
