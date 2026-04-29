@@ -26,10 +26,10 @@ spec:
               image: PLACEHOLDER_IMAGE
               imagePullPolicy: IfNotPresent
               # Runtime-neutral: no env vars by default. JVM consumers add
-              # JAVA_TOOL_OPTIONS via a deployment-env strategic-merge patch in
-              # their overlay; Python/Go consumers add their own runtime
-              # configuration. See README "Workload Selection" for the full
-              # runtime classification of each workload.
+              # JAVA_TOOL_OPTIONS via a strategic-merge patch in their overlay;
+              # Python/Go consumers add their own runtime configuration. See
+              # README "Workload Selection" for the full runtime classification
+              # of each workload.
               resources:
                 requests:
                   cpu: "500m"

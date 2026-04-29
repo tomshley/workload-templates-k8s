@@ -11,10 +11,10 @@ This project follows Semantic Versioning.
 ### Changed (BREAKING)
 
 - **`workloads/deployment-http`** — runtime-neutral cleanup so the workload matches its name (a stateless HTTP Deployment, not a JVM HTTP Deployment). Pekko Cluster services should consume `workloads/pekko-cluster`, which continues to bundle JVM heap tuning, the remoting + management ports, and cluster-leave lifecycle defaults.
-  - **Removed `JAVA_TOOL_OPTIONS` env var.** JVM consumers add it back via a deployment-env patch in their overlay; non-JVM consumers no longer ship an unused env var.
+  - **Removed `JAVA_TOOL_OPTIONS` env var.** JVM consumers add it back via a strategic-merge patch in their overlay; non-JVM consumers no longer ship an unused env var.
   - **Removed `management` port at containerPort 7626.** Pekko Management is a Pekko-specific concept and belongs in `workloads/pekko-cluster` (which retains it). Consumers without Pekko Management run a single-port pod by default.
-  - **Retargeted all probes (`startupProbe`, `readinessProbe`, `livenessProbe`) to the `http` port** — the management port no longer exists on this workload. Probe paths (`/alive` for liveness, `/ready` for readiness/startup) are unchanged; their semantics are runtime-neutral and align with the convention exposed by `tomshley/boilerplate-jvm` (Pekko Management) and downstream service libraries that follow the same convention.
-- **`workloads/cron-job`** — runtime-neutral cleanup matching `deployment-http`. Removed the `JAVA_TOOL_OPTIONS` env var so the template is no longer JVM-flavoured by default; JVM consumers add it back via a strategic-merge patch in their overlay. Non-JVM consumers no longer carry an unused env var.
+  - **Retargeted all probes (`startupProbe`, `readinessProbe`, `livenessProbe`) to the `http` port** — the management port no longer exists on this workload. Probe paths (`/alive` for liveness, `/ready` for readiness/startup) are unchanged; their semantics are runtime-neutral and align with the convention shared with `tomshley/boilerplate-jvm` (Pekko Management) and downstream service libraries that follow the same convention.
+- **`workloads/cron-job`** — runtime-neutral cleanup matching `deployment-http`. Removed the `JAVA_TOOL_OPTIONS` env var so the template is no longer JVM-specific by default; JVM consumers add it back via a strategic-merge patch in their overlay. Non-JVM consumers no longer carry an unused env var.
 - **`workloads/stateful-service`** — probe paths aligned to the repo-wide `/alive` + `/ready` convention:
   - `livenessProbe.httpGet.path`: `/healthz` → `/alive`
   - `startupProbe.httpGet.path`: `/healthz` → `/ready`
