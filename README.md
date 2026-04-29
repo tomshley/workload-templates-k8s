@@ -44,7 +44,7 @@ Workloads compose components. Examples show how workloads and components combine
 
 ### Workload Selection
 
-`deployment-http` is **runtime-neutral** — no language-specific env vars, a single `http` port, probes targeting that port. Suitable for any HTTP service runtime (JVM, Python, Go, Node, …). JVM consumers without Pekko Cluster requirements add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay (see the `[Unreleased]` migration notes in [`CHANGELOG.md`](./CHANGELOG.md) for the recipe). Note that the resource floor (`cpu: 500m`, `memory: 1Gi` / `2Gi`) and `startupProbe.failureThreshold` (120s window) are sized for JVM-class workloads; lower-footprint runtimes (Python, Go) typically tighten both in their overlay.
+`deployment-http` is **runtime-neutral** — no language-specific env vars, a single `http` port, probes targeting that port. Suitable for any HTTP service runtime (JVM, Python, Go, Node, …). JVM consumers without Pekko Cluster requirements add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay (see the migration notes for the active breaking-change set in [`CHANGELOG.md`](./CHANGELOG.md) for the recipe).
 
 `pekko-cluster` is a **JVM/Pekko specialization** that bundles the defaults a Pekko Cluster service needs out of the box: JVM heap tuning, the Pekko Management port (7626), the remoting port (7355), Downward-API-driven `APP_LABEL` for contact-point discovery, and a longer cluster-leave grace period. Use it whenever your service participates in a Pekko Cluster.
 
@@ -192,11 +192,11 @@ The `pekko-cluster` template exposes `APP_LABEL` as an env var for Pekko's conta
 
 ## Resource Customization
 
-Template resource defaults are conservative starting points. Consumers should adjust based on workload characteristics:
+Template resource defaults (`cpu: 500m`, `memory: 1Gi` / `2Gi` and a `startupProbe.failureThreshold` window of 120–150s) are sized for JVM-class workloads. Lower-footprint runtimes (Python, Go, Node) typically tighten both the resource floor and the startup-probe window in their overlay. Consumers should adjust based on workload characteristics:
 
 - **replicas** — Scale for availability and throughput requirements
 - **CPU requests** — Size for steady-state processing needs  
-- **Memory limits** — Adjust for heap / runtime footprint (the `pekko-cluster` template bundles `-XX:MaxRAMPercentage=70`; other workloads are runtime-neutral and leave heap sizing to the consumer overlay)
+- **Memory limits** — Adjust for heap / runtime footprint (the `pekko-cluster` template bundles `-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70`; other workloads are runtime-neutral and leave heap sizing to the consumer overlay)
 - **Storage requests** — StatefulSet PVC sizing for data volume
 
 Override via Kustomize patches in your service overlay:
