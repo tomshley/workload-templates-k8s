@@ -42,6 +42,27 @@ The repository is organized around two orthogonal axes:
 
 Workloads compose components. Examples show how workloads and components combine for specific use cases.
 
+### Workload Selection
+
+`deployment-http` is **runtime-neutral** — no language-specific env vars, a single `http` port, probes targeting that port. Suitable for any HTTP service runtime (JVM, Python, Go, Node, …). JVM consumers without Pekko Cluster requirements add `JAVA_TOOL_OPTIONS` via a deployment-env strategic-merge patch in their overlay. Note that the resource floor (`cpu: 500m`, `memory: 1Gi` / `2Gi`) and `startupProbe.failureThreshold` (120s window) are sized for JVM-class workloads; lower-footprint runtimes (Python, Go) typically tighten both in their overlay.
+
+`pekko-cluster` is a **JVM/Pekko specialization** that bundles the defaults a Pekko Cluster service needs out of the box: JVM heap tuning, the Pekko Management port (7626), the remoting port (7355), Downward-API-driven `APP_LABEL` for contact-point discovery, and a longer cluster-leave grace period. Use it whenever your service participates in a Pekko Cluster.
+
+`stateful-service` is a **runtime-neutral** StatefulSet with a longer preStop grace period and Downward-API pod-identity env (`POD_NAME`, `POD_NAMESPACE`). Probes follow the repo-wide `/alive` + `/ready` convention.
+
+`cron-job` is a **runtime-neutral** CronJob template with `concurrencyPolicy: Forbid`. JVM consumers add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay.
+
+### Probe Convention
+
+All three HTTP-serving workloads (`deployment-http`, `pekko-cluster`, `stateful-service`) expose the same two probe **paths**:
+
+- **`/alive`** — liveness; the process is alive. Always returns 200 for a running pod.
+- **`/ready`** — readiness; the pod's dependencies are ready and it can accept traffic. Returns 200 only when readiness gates pass; 5xx otherwise.
+
+Probe **ports** differ by workload: `deployment-http` and `stateful-service` target `port: http` (the application port); `pekko-cluster` targets `port: management` (Pekko Management's 7626, separate from the remoting and application data planes). Consumers that want to split probes off the application port on `deployment-http` or `stateful-service` can patch the `port:` field without changing paths.
+
+The convention originates from Pekko Management's `HealthCheckRoutes` and is implementable by any HTTP service with two trivial routes. Downstream service libraries (e.g. `tomshley/boilerplate-jvm`, Python service helpers built on FastAPI) ship `make_health_router`-style helpers that produce these two endpoints.
+
 ---
 
 ## Project Structure
@@ -175,7 +196,7 @@ Template resource defaults are conservative starting points. Consumers should ad
 
 - **replicas** — Scale for availability and throughput requirements
 - **CPU requests** — Size for steady-state processing needs  
-- **Memory limits** — Adjust for heap requirements (JVM templates use `MaxRAMPercentage=70%`)
+- **Memory limits** — Adjust for heap / runtime footprint (the `pekko-cluster` template bundles `-XX:MaxRAMPercentage=70`; other workloads are runtime-neutral and leave heap sizing to the consumer overlay)
 - **Storage requests** — StatefulSet PVC sizing for data volume
 
 Override via Kustomize patches in your service overlay:

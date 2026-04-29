@@ -40,32 +40,38 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-            - name: management
-              containerPort: 7626
-              protocol: TCP
           lifecycle:
             preStop:
               exec:
                 command: ["sh", "-c", "sleep 5"]  # Shorter sleep for stateless HTTP (vs 10s for stateful workloads)
-          env:
-            - name: JAVA_TOOL_OPTIONS
-              value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
+          # Runtime-neutral: no env vars by default. JVM consumers add JAVA_TOOL_OPTIONS
+          # via a deployment-env patch in their overlay; Python/Go consumers add their own
+          # runtime configuration. Pekko Cluster services should consume
+          # `workloads/pekko-cluster` instead, which bundles JVM heap tuning, the
+          # remoting + management ports, and cluster-leave lifecycle defaults.
+          #
+          # Probe paths follow the convention shared with `tomshley/boilerplate-jvm`:
+          #   /alive  — liveness (process is alive); always-200 for a running pod
+          #   /ready  — readiness (dependencies are ready); 200 only when the pod
+          #             can accept traffic
+          # Probes target the `http` port — single-port mode by default. Consumers
+          # that expose a separate management/admin port can patch the probe target.
           startupProbe:
             httpGet:
               path: /ready
-              port: management
+              port: http
             periodSeconds: 5
             failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /ready
-              port: management
+              port: http
             periodSeconds: 10
             failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /alive
-              port: management
+              port: http
             periodSeconds: 10
             failureThreshold: 5
           resources:
