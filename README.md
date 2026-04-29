@@ -61,7 +61,7 @@ All three HTTP-serving workloads (`deployment-http`, `pekko-cluster`, `stateful-
 
 Probe **ports** differ by workload: `deployment-http` and `stateful-service` target `port: http` (the application port); `pekko-cluster` targets `port: management` (Pekko Management's 7626, separate from the remoting and application data planes). Consumers that want to split probes off the application port on `deployment-http` or `stateful-service` can patch the `port:` field without changing paths.
 
-The convention originates from Pekko Management's `HealthCheckRoutes` and is implementable by any HTTP service with two trivial routes — the JVM side ships out-of-the-box via `tomshley/boilerplate-jvm`, and any HTTP framework on any runtime can serve the same two paths in a few lines of handler code.
+The convention originates from Pekko Management's `HealthCheckRoutes` and is implementable by any HTTP service with two trivial routes. The JVM side ships out-of-the-box via `tomshley/boilerplate-jvm`; any HTTP framework on any runtime can serve the same two paths in a few lines of handler code.
 
 ---
 
