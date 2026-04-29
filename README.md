@@ -42,6 +42,27 @@ The repository is organized around two orthogonal axes:
 
 Workloads compose components. Examples show how workloads and components combine for specific use cases.
 
+### Workload Selection
+
+`deployment-http` is **runtime-neutral** — no language-specific env vars, a single `http` port, probes targeting that port. Suitable for any HTTP service runtime (JVM, Python, Go, Node, …). JVM consumers without Pekko Cluster requirements add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay (see [`CHANGELOG.md`](./CHANGELOG.md) for the patch recipe).
+
+`pekko-cluster` is a **JVM/Pekko specialization** that bundles the defaults a Pekko Cluster service needs out of the box: JVM heap tuning, the Pekko Management port (7626), the remoting port (7355), Downward-API-driven `APP_LABEL` for contact-point discovery, and a longer cluster-leave grace period. Use it whenever your service participates in a Pekko Cluster.
+
+`stateful-service` is a **runtime-neutral** StatefulSet with a longer preStop grace period and Downward-API pod-identity env (`POD_NAME`, `POD_NAMESPACE`). Probes follow the repo-wide `/alive` + `/ready` convention.
+
+`cron-job` is a **runtime-neutral** CronJob template with `concurrencyPolicy: Forbid`. JVM consumers add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay (see [`CHANGELOG.md`](./CHANGELOG.md) for the patch recipe; note the deeper `spec.jobTemplate.spec.template.spec.containers` path that `CronJob` requires).
+
+### Probe Convention
+
+All three HTTP-serving workloads (`deployment-http`, `pekko-cluster`, `stateful-service`) expose the same two probe **paths**:
+
+- **`/alive`** — liveness; the process is alive. Always returns 200 for a running pod.
+- **`/ready`** — readiness; the pod's dependencies are ready and it can accept traffic. Returns 200 only when readiness gates pass; 5xx otherwise.
+
+Probe **ports** differ by workload: `deployment-http` and `stateful-service` target `port: http` (the application port); `pekko-cluster` targets `port: management` (Pekko Management's 7626, separate from the remoting and application data planes). Consumers that want to split probes off the application port on `deployment-http` or `stateful-service` can patch the `port:` field without changing paths.
+
+The convention originates from Pekko Management's `HealthCheckRoutes` and is implementable by any HTTP service with two trivial routes. The JVM side ships out-of-the-box via `tomshley/boilerplate-jvm`; any HTTP framework on any runtime can serve the same two paths in a few lines of handler code.
+
 ---
 
 ## Project Structure
@@ -94,8 +115,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.3.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.3.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.4.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.4.0
 ```
 
 Benefits:
@@ -108,7 +129,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.3.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.4.0
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
@@ -171,11 +192,11 @@ The `pekko-cluster` template exposes `APP_LABEL` as an env var for Pekko's conta
 
 ## Resource Customization
 
-Template resource defaults are conservative starting points. Consumers should adjust based on workload characteristics:
+Template resource defaults — `cpu: 500m`, `memory: 1Gi` / `2Gi` across all four workloads and a `startupProbe.failureThreshold` window of 120–150s on the three HTTP-serving workloads — are sized for JVM-class services. Lower-footprint runtimes (Python, Go, Node) typically tighten both the resource floor and (where applicable) the startup-probe window in their overlay. Consumers should adjust based on workload characteristics:
 
 - **replicas** — Scale for availability and throughput requirements
 - **CPU requests** — Size for steady-state processing needs  
-- **Memory limits** — Adjust for heap requirements (JVM templates use `MaxRAMPercentage=70%`)
+- **Memory limits** — Adjust for heap / runtime footprint (the `pekko-cluster` template bundles `-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70`; other workloads are runtime-neutral and leave heap sizing to the consumer overlay)
 - **Storage requests** — StatefulSet PVC sizing for data volume
 
 Override via Kustomize patches in your service overlay:
