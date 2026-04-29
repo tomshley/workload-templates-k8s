@@ -49,11 +49,50 @@ This project follows Semantic Versioning.
   Strategic merge uses `name` as the merge key on the `env` list, so this patch **adds** `JAVA_TOOL_OPTIONS` without clobbering any other env-injecting patch in your overlay (DB credentials, runtime config, etc.). A JSON 6902 `op: add` on `/spec/template/spec/containers/0/env` would instead **replace** the entire list — silently dropping every other env var — whenever the field already exists; prefer the strategic-merge form above.
 
   If you also relied on Pekko Management on port 7626 without consuming `pekko-cluster`, either migrate to `pekko-cluster` (recommended) or layer a deployment-ports patch + probe-port patch to restore the prior shape.
+- **JVM consumers** of `workloads/cron-job` — the equivalent strategic-merge patch (note the deeper `jobTemplate.spec.template.spec.containers` path that `CronJob` requires versus `Deployment`):
+
+  ```yaml
+  patches:
+    - target:
+        kind: CronJob
+        name: -app
+      patch: |-
+        apiVersion: batch/v1
+        kind: CronJob
+        metadata:
+          name: -app
+        spec:
+          jobTemplate:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: app
+                      env:
+                        - name: JAVA_TOOL_OPTIONS
+                          value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
+  ```
+
+- **Existing consumers of `workloads/stateful-service`** — if your application served `/healthz` (the prior template default) for liveness and startup, either:
+  - **(a)** rename the route to `/alive` so it matches the new repo-wide convention shared with `deployment-http` and `pekko-cluster`; or
+  - **(b)** patch the probe `path:` fields back to `/healthz` in your overlay:
+
+    ```yaml
+    patches:
+      - target:
+          kind: StatefulSet
+          name: -app
+        patch: |-
+          - op: replace
+            path: /spec/template/spec/containers/0/livenessProbe/httpGet/path
+            value: /healthz
+          - op: replace
+            path: /spec/template/spec/containers/0/startupProbe/httpGet/path
+            value: /healthz
+    ```
+
+    Both probes are at fixed indices on a single-container template, so the JSON 6902 `op: replace` form is safe here (no list-clobbering risk because the targets are scalar leaf fields, not list members).
 - **Python / Go consumers** — your overlay simplifies. Remove any prior patches that stripped `JAVA_TOOL_OPTIONS`, deleted the `management` port, or rerouted probes to `port: http`; the template now defaults to that shape.
-
-### Changed
-
-- **`workloads/stateful-service/statefulset.yaml`** — comment updated to point to `pekko-cluster` for JVM/Pekko patterns (was previously cross-referencing `deployment-http`, which no longer carries JVM defaults).
 
 ---
 

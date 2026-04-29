@@ -53,11 +53,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          # Probe paths follow the repo-wide convention shared with
-          # `deployment-http` and `pekko-cluster`:
+          # Probe paths follow the convention shared with `tomshley/boilerplate-jvm`:
           #   /alive  — liveness (process is alive); always-200 for a running pod
           #   /ready  — readiness (dependencies are ready); 200 only when the pod
           #             can accept traffic
+          # Probes target the `http` port — single-port mode by default. Consumers
+          # that expose a separate management/admin port can patch the probe target.
           startupProbe:
             httpGet:
               path: /ready
