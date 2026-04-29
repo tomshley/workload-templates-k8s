@@ -22,7 +22,7 @@ This project follows Semantic Versioning.
 
 ### Migration notes
 
-- **Pekko Cluster consumers** (`workloads/pekko-cluster`) — unaffected. `pekko-cluster` continues to expose the `management` port (7626), `JAVA_TOOL_OPTIONS`, remoting, and Pekko-Cluster-specific lifecycle defaults.
+- **Consumers** of `workloads/pekko-cluster` — unaffected. `pekko-cluster` continues to expose the `management` port (7626), `JAVA_TOOL_OPTIONS`, remoting, and Pekko-Cluster-specific lifecycle defaults.
 - **Non-clustered JVM consumers** of `workloads/deployment-http` — add the following strategic-merge patch to your overlay if you previously relied on the JVM heap-percentage tuning:
 
   ```yaml
