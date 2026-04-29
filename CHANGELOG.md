@@ -15,7 +15,7 @@ This project follows Semantic Versioning.
   - **Removed `management` port at containerPort 7626.** Pekko Management is a Pekko-specific concept and belongs in `workloads/pekko-cluster` (which retains it). Consumers without Pekko Management run a single-port pod by default.
   - **Retargeted all probes (`startupProbe`, `readinessProbe`, `livenessProbe`) to the `http` port** — the management port no longer exists on this workload. Probe paths (`/alive` for liveness, `/ready` for readiness/startup) are unchanged; their semantics follow the convention from Pekko Management's `HealthCheckRoutes`.
 - **`workloads/cron-job`** — runtime-neutral cleanup matching `deployment-http`. Removed the `JAVA_TOOL_OPTIONS` env var so the template is no longer JVM-specific by default; JVM consumers add it back via a strategic-merge patch in their overlay. Non-JVM consumers no longer carry an unused env var.
-- **`workloads/stateful-service`** — probe paths aligned to the repo-wide `/alive` + `/ready` convention. Only the path names change; ports (`http`) and timing (`periodSeconds`, `failureThreshold`) are unchanged. The readinessProbe path is unchanged; only liveness and startup move off `/healthz`. Existing consumers either (a) add an `/alive` route to their HTTP handler (the existing `/ready` is now wired to both readinessProbe and startupProbe), or (b) patch the probe `path:` fields back to `/healthz` in their overlay (see migration notes below).
+- **`workloads/stateful-service`** — probe paths aligned to the repo-wide `/alive` + `/ready` convention. Only the path names change; ports (`http`) and timing (`periodSeconds`, `failureThreshold`) are unchanged. Existing consumers either (a) add an `/alive` route alongside the existing `/ready`, or (b) patch the probe `path:` fields back to `/healthz` in their overlay. See the migration notes below for both recipes.
   - `livenessProbe.httpGet.path`: `/healthz` → `/alive`
   - `startupProbe.httpGet.path`: `/healthz` → `/ready`
   - `readinessProbe.httpGet.path`: unchanged (`/ready`)
@@ -72,9 +72,9 @@ This project follows Semantic Versioning.
                           value: "-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=70"
   ```
 
-- **Existing consumers of `workloads/stateful-service`** — the readinessProbe path is unchanged (`/ready`); only liveness and startup move off `/healthz`. The new layout has three distinct paths (`/alive`, `/ready`, and an unused-by-the-template `/healthz`), so a simple route rename is not enough. Choose one of:
-  - **(a)** add an `/alive` HTTP route to your handler that always returns 200 for a running process. Your existing `/ready` route (already wired to readinessProbe in the prior template) is now also wired to startupProbe, so no second new route is required. `/healthz` can be deleted or kept as an internal alias — the template no longer references it; or
-  - **(b)** keep `/healthz` and patch the probe `path:` fields back to `/healthz` in your overlay (note that this only adjusts liveness and startup; the readinessProbe still points at `/ready`):
+- **Existing consumers of `workloads/stateful-service`** — the readinessProbe path is unchanged (`/ready`); only liveness and startup move off `/healthz`. The template now references two probe paths (`/alive` and `/ready`); `/healthz` is no longer probed. Choose one of:
+  - **(a)** add an `/alive` route that returns 200 for a running process. The existing `/ready` route (already used by readinessProbe) is now also used by startupProbe, so no other route is required. `/healthz` can be deleted or left in place as an internal alias — the template no longer references it.
+  - **(b)** keep `/healthz` and patch the probe `path:` fields back in your overlay. This only adjusts liveness and startup; the readinessProbe still points at `/ready`:
 
     ```yaml
     patches:
