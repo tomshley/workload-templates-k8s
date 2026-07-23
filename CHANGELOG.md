@@ -6,10 +6,7 @@ This project follows Semantic Versioning.
 
 ---
 
-## [Unreleased]
-
-Target version: `0.5.0`. Replace this heading with the actual publication date
-only when the immutable release tag is created.
+## [0.5.0] - 2026-07-23
 
 ### Added
 
