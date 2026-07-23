@@ -16,7 +16,7 @@ Service repos reference templates via GitLab/GitHub URLs:
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.1.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.6.0
 ```
 
 **Pattern**: `{host}/{org}/{repo}//{path}?ref={version}`
@@ -40,7 +40,7 @@ namespace: your-platform-namespace
 
 ### 2. Name Prefix
 ```yaml
-namePrefix: egress
+namePrefix: orders
 ```
 
 Prevents resource name collisions when multiple services share a namespace.
@@ -49,7 +49,7 @@ Prevents resource name collisions when multiple services share a namespace.
 ```yaml
 labels:
   - pairs:
-      app: egress
+      app: orders
     includeSelectors: true
 ```
 
@@ -59,7 +59,7 @@ For Pekko clusters, add `actorSystemName` in a **separate** block to avoid coupl
 
 ```yaml
   - pairs:
-      actorSystemName: egress
+      actorSystemName: orders
     includeSelectors: false
     includeTemplates: true
 ```
@@ -172,12 +172,12 @@ kustomize build examples/service-consumer | kubectl apply -f -
 
 ### Staging
 ```yaml
-?ref=v0.1.0  # Pin to specific release
+?ref=v0.6.0  # Pin to specific release
 ```
 
 ### Production
 ```yaml
-?ref=v0.1.0  # Always pin to tested version
+?ref=v0.6.0  # Always pin to tested version
 ```
 
 Update production pins only after staging validation.
