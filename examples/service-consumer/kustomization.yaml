@@ -24,41 +24,41 @@ kind: Kustomization
 namespace: my-platform
 
 # Prefix all resource names to avoid collisions in shared namespaces
-# Result: metadata.name becomes "egress-app", "egress-app-bootstrap", etc.
-namePrefix: egress
+# Result: metadata.name becomes "orders-app", "orders-app-bootstrap", etc.
+namePrefix: orders
 
 # Fetch kustomizeconfig.yaml for safe name + label transformations
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.1.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.6.0
 
 # Remote template references (GitLab URL format)
 # Pattern: gitlab.com/{org}/{repo}//{path}?ref={version}
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.1.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.1.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/pdb?ref=v0.1.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/service-headless-pekko-bootstrap?ref=v0.1.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.6.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.6.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/pdb?ref=v0.6.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/service-headless-pekko-bootstrap?ref=v0.6.0
   # Note: DNS bootstrap via headless service. For K8s API bootstrap, use rbac-pod-reader instead.
 
 # Identity labels — `app` is the canonical selector/routing label
 # Must be unique per deployment in the namespace to avoid cross-selection
 labels:
   - pairs:
-      app: egress
+      app: orders
     includeSelectors: true
 
   # Pekko-specific: actorSystemName for cluster member discovery
   # Separate block keeps it out of Service/PDB selectors (no unnecessary coupling)
   # Non-Pekko consumers (deployment-http, stateful-service, cron-job) omit this block
   - pairs:
-      actorSystemName: egress
+      actorSystemName: orders
     includeSelectors: false
     includeTemplates: true
 
 # Replace placeholder image with actual service image
 images:
   - name: PLACEHOLDER_IMAGE
-    newName: registry.example.com/my-org/egress-server
+    newName: registry.example.com/my-org/orders-server
     newTag: "1.0.0"
 
 # Service-specific configuration patches would go in patches/ directory

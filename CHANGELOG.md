@@ -6,6 +6,59 @@ This project follows Semantic Versioning.
 
 ---
 
+## [0.6.0] - 2026-07-23
+
+### Changed (BREAKING)
+
+- **Provider-coupled templates are restructured as thin `-aws` wrappers over
+  provider-neutral bases.** The library's core (all workloads and unpostfixed
+  components) is provider-neutral by contract and renders on any conformant
+  Kubernetes (k3s, kind, bare-metal, managed clouds); leaving a provider is
+  now a one-line path swap from the wrapper to its base or a sibling wrapper.
+
+  | 0.5.0 path | 0.6.0 path |
+  |---|---|
+  | `components/service-nlb-tcp` | `components/service-tcp-loadbalancer` (neutral base) + `components/service-tcp-loadbalancer-aws` (AWS wrapper) |
+  | `components/karpenter-nodepool` | `components/karpenter-nodepool` (now an abstract neutral base) + `components/karpenter-nodepool-aws` (AWS wrapper) |
+  | `components/connection-rds-cert` | `components/connection-db-ca-cert` (fully generic — no wrapper needed) |
+  | `examples/scaling-hpa-karpenter` | `examples/scaling-hpa-karpenter-aws` |
+
+  Migration:
+
+  - **NLB consumers** switch to `service-tcp-loadbalancer-aws`. The Service is
+    renamed `-app-nlb` → `-app-tcp` (the base is TLS- and provider-agnostic);
+    update overlay patches and any external references to the rendered name.
+    The wrapper's rendered annotations are unchanged from 0.5.0.
+  - **Karpenter consumers** switch to `karpenter-nodepool-aws`; its rendered
+    output is identical to 0.5.0 (EC2NodeClass, nodeClassRef binding, EC2
+    instance-type requirement). The old path now renders the abstract base,
+    whose placeholder `nodeClassRef` the API server rejects — a stale pin
+    fails loudly instead of silently.
+  - **RDS certificate consumers** switch to `connection-db-ca-cert`. The
+    Secret is renamed `-rds-ca-bundle` → `-db-ca-bundle` and its key
+    `rds-ca-bundle.pem` → `db-ca-bundle.pem`; update volume `secretName`
+    references and mounted file paths. The component now serves any database
+    CA (PostgreSQL, YugabyteDB, CloudNativePG, AWS RDS, …).
+
+### Added
+
+- **Portability contract** (README "Portability"): unpostfixed templates use
+  only stable core APIs and never require a cloud-specific controller, CRD,
+  storage class, or annotation; provider bindings live in `-<provider>`
+  wrappers that no neutral template may depend on; abstract bases fail closed
+  (`karpenter-nodepool`'s placeholder `nodeClassRef`, like the leading-hyphen
+  names and `PLACEHOLDER_IMAGE`). `connection-s3` is documented as
+  protocol-scoped (any S3-compatible object store), not provider-scoped.
+
+### Changed
+
+- Documentation and the `service-consumer` example use a neutral placeholder
+  service name (`orders`) and current version pins throughout; the AWS
+  wrappers and the scaling example carry explicit opt-in banners with
+  substrate-neutral alternatives.
+
+---
+
 ## [0.5.0] - 2026-07-23
 
 ### Added

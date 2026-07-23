@@ -1,0 +1,20 @@
+# Provider-neutral Layer-4 LoadBalancer Service for TCP workloads. Renders on
+# any substrate with a LoadBalancer implementation (k3s ServiceLB, MetalLB,
+# cloud controllers). It carries no provider annotations and does not
+# terminate TLS; provider wrappers (e.g. `service-tcp-loadbalancer-aws`)
+# layer those concerns on top of this base.
+apiVersion: v1
+kind: Service
+metadata:
+  name: -app-tcp
+  labels:
+    app: app
+spec:
+  type: LoadBalancer
+  selector:
+    app: app
+  ports:
+    - name: tcp
+      port: 8443
+      targetPort: 8443
+      protocol: TCP

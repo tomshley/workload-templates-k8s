@@ -85,25 +85,27 @@ workloads/
   stateful-service/       — Generic StatefulSet template
 
 components/
+  connection-db-ca-cert/   — Database CA bundle Secret (PostgreSQL, YugabyteDB, RDS, …)
   connection-kafka/         — Kafka connection Secret
   connection-postgres/     — PostgreSQL connection Secret/ConfigMap
-  connection-rds-cert/     — AWS RDS SSL certificate Secret
-  connection-s3/           — S3 connection ConfigMap
+  connection-s3/           — S3-compatible object storage ConfigMap
   credentials-registry/    — Container registry credentials Secret
   hpa/                    — HorizontalPodAutoscaler
-  karpenter-nodepool/     — Karpenter NodePool + EC2NodeClass (AWS)
+  karpenter-nodepool/     — Karpenter NodePool policy (abstract base for provider wrappers)
+  karpenter-nodepool-aws/ — AWS wrapper: EC2NodeClass + nodeClassRef binding
   pdb/                    — PodDisruptionBudget
   rbac-pod-reader/        — RBAC Role + RoleBinding for pod discovery
   service-headless-pekko-bootstrap/ — Headless Service for Pekko cluster bootstrapping
-  service-nlb-tcp/        — AWS NLB TCP Service with TLS termination
   service-public-http/    — Public-facing HTTP Service
+  service-tcp-loadbalancer/     — TCP LoadBalancer Service (provider-neutral)
+  service-tcp-loadbalancer-aws/ — AWS wrapper: NLB + ACM TLS annotations
   serviceaccount/         — ServiceAccount
 
 examples/
   image-pull-secret/                      — imagePullSecrets patch pattern
   pekko-cluster-dns-bootstrap/            — DNS-based Pekko Cluster bootstrap
   pekko-cluster-kubernetes-api-bootstrap/ — Kubernetes API-based Pekko Cluster bootstrap
-  scaling-hpa-karpenter/                  — HPA + Karpenter NodePool autoscaling (AWS)
+  scaling-hpa-karpenter-aws/              — HPA + Karpenter NodePool autoscaling (AWS-specific)
   service-consumer/                       — Remote consumption patterns
 
 assets/
@@ -112,6 +114,40 @@ assets/
 kustomizeconfig.yaml — Kustomize nameReference, label fieldSpecs, and image transformation configuration
 VERSION
 ```
+
+---
+
+## Portability
+
+The core of this library is **provider-neutral by contract**:
+
+- **Workloads and unpostfixed components target any conformant Kubernetes** —
+  k3s, kind, bare-metal kubeadm, and every managed offering alike. They use
+  only stable core APIs (`apps/v1`, `autoscaling/v2`, `policy/v1`, RBAC) and
+  never require a cloud-specific controller, CRD, storage class, or
+  annotation to render and run.
+- **Provider-specific behavior ships as a thin, postfixed wrapper over a
+  neutral base.** `service-tcp-loadbalancer-aws` adds AWS NLB/ACM annotations
+  to the neutral `service-tcp-loadbalancer`; `karpenter-nodepool-aws` binds
+  the neutral `karpenter-nodepool` policy base to the AWS `EC2NodeClass`.
+  Leaving a provider means swapping the wrapper path for the base's (or
+  another provider's wrapper) — the base and everything layered on it stay
+  put. Wrappers are opt-in leaves: nothing in `workloads/`, in a neutral
+  component, or in `kustomizeconfig.yaml` depends on them for correct
+  rendering.
+- **Bases that cannot deploy alone fail closed.** `karpenter-nodepool` is an
+  abstract base: Karpenter always needs a provider NodeClass, so the base's
+  `nodeClassRef` is a placeholder the API server rejects — the same guard-rail
+  idea as the leading-hyphen names and `PLACEHOLDER_IMAGE`.
+- **Connection components are protocol- or product-scoped, never
+  provider-scoped** — `connection-s3` configures any S3-compatible object
+  store (MinIO, Ceph RGW, AWS S3, …); `connection-db-ca-cert` carries any
+  database CA bundle (PostgreSQL, YugabyteDB, CloudNativePG, AWS RDS, …).
+
+Contributions adding provider-coupled behavior are welcome under the same
+rule: keep the neutral base free of provider fields, put provider bindings
+in a `-<provider>` wrapper, and never make a neutral template depend on a
+provider-postfixed one.
 
 ---
 
@@ -125,8 +161,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.5.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.5.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.6.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.6.0
 ```
 
 Benefits:
@@ -139,7 +175,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.5.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.6.0
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
@@ -154,7 +190,7 @@ This ensures cross-resource references (ServiceAccount, Service, Secret, Role) a
 
 > **Labels define identity. Names are cosmetic.**
 
-Templates use hyphen-prefixed default names (`-app`, `-kafka-credentials`, etc.) that Kustomize's `namePrefix` transforms into clean, production-ready resource names (e.g. `egress-app`). The leading hyphen acts as a **guard rail** — if a consumer forgets to set `namePrefix`, the resulting resource names (e.g. `-app`) will fail validation, making the omission obvious. Consumer `namePrefix` values should **not** include a trailing hyphen; the template's leading hyphen provides the separator. Service identity is driven by **labels**, not resource names.
+Templates use hyphen-prefixed default names (`-app`, `-kafka-credentials`, etc.) that Kustomize's `namePrefix` transforms into clean, production-ready resource names (e.g. `orders-app`). The leading hyphen acts as a **guard rail** — if a consumer forgets to set `namePrefix`, the resulting resource names (e.g. `-app`) will fail validation, making the omission obvious. Consumer `namePrefix` values should **not** include a trailing hyphen; the template's leading hyphen provides the separator. Service identity is driven by **labels**, not resource names.
 
 ### How It Works
 
@@ -163,7 +199,7 @@ Consumer overlays set the `app` label via Kustomize's `labels` transformer:
 ```yaml
 labels:
   - pairs:
-      app: egress
+      app: orders
     includeSelectors: true
 ```
 
@@ -177,7 +213,7 @@ This ensures consistent identity across all composed resources without manual pa
 
 ### Best Practice
 
-The `app` label **must be unique per deployment** in a namespace. Two services with `app: egress` in the same namespace will cross-select (PDBs target wrong pods, Services route to wrong backends, Pekko clusters cross-discover).
+The `app` label **must be unique per deployment** in a namespace. Two services with `app: orders` in the same namespace will cross-select (PDBs target wrong pods, Services route to wrong backends, Pekko clusters cross-discover).
 
 ### `PLACEHOLDER_IMAGE`
 
@@ -186,7 +222,7 @@ The `app` label **must be unique per deployment** in a namespace. Two services w
 ```yaml
 images:
   - name: PLACEHOLDER_IMAGE
-    newName: registry.example.com/my-org/egress-server
+    newName: registry.example.com/my-org/orders-server
     newTag: "1.0.0"
 ```
 
@@ -340,11 +376,28 @@ The `hpa` component provides a `HorizontalPodAutoscaler` that scales the Deploym
 
 The `kustomizeconfig.yaml` nameReference ensures `scaleTargetRef.name` is automatically rewritten when `namePrefix` is applied.
 
-### Karpenter NodePool + EC2NodeClass (AWS)
+### Karpenter NodePool (neutral base + AWS wrapper)
 
-The `karpenter-nodepool` component provides a `NodePool` and `EC2NodeClass` for just-in-time node provisioning on AWS EKS. When HPA scales pods beyond cluster capacity, Karpenter provisions new EC2 instances matching the NodePool constraints.
+Karpenter splits across two components following the wrapper pattern from
+[Portability](#portability):
 
-**Prerequisites:**
+- **`karpenter-nodepool`** — the provider-neutral policy base (`NodePool` is a
+  core `karpenter.sh` kind): capacity type, resource limits, consolidation.
+  It is **abstract**: its `nodeClassRef` is a fail-closed placeholder, because
+  every Karpenter installation requires a provider NodeClass. Never consume it
+  directly.
+- **`karpenter-nodepool-aws`** — the AWS wrapper: supplies the `EC2NodeClass`,
+  binds the base's `nodeClassRef` to it, and appends the EC2 instance-type
+  requirement. When HPA scales pods beyond cluster capacity, Karpenter
+  provisions new EC2 instances matching the NodePool constraints.
+
+Other Karpenter providers (Azure, GCP, Cluster API, …) pair the same base
+with their own NodeClass kind — sibling `karpenter-nodepool-<provider>`
+wrappers are welcome contributions. Substrates without a Karpenter provider
+use their platform's node autoscaling and consume the provider-neutral `hpa`
+alone.
+
+**Prerequisites (AWS wrapper):**
 - Karpenter controller installed in the cluster (via Terraform/Helm)
 - IAM roles for controller (IRSA) and node instances
 - Discovery tags on VPC subnets and security groups: `karpenter.sh/discovery: <cluster-name>`
@@ -365,7 +418,7 @@ patches:
 
 Where `patches/ec2nodeclass-env.yaml` replaces `PLACEHOLDER_KARPENTER_NODE_ROLE` and `PLACEHOLDER_CLUSTER_NAME` with real values from your infrastructure outputs.
 
-See `examples/scaling-hpa-karpenter/` for the complete pattern including HPA + Karpenter composition.
+See `examples/scaling-hpa-karpenter-aws/` for the complete pattern including HPA + Karpenter composition.
 
 The `kustomizeconfig.yaml` nameReference ensures `nodeClassRef.name` in the NodePool is automatically rewritten when `namePrefix` is applied.
 
