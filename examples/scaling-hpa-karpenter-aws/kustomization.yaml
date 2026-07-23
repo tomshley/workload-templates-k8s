@@ -1,7 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Example: HPA + Karpenter NodePool scaling for a Pekko Cluster workload
+# Example (AWS-specific): HPA + Karpenter NodePool scaling for a Pekko
+# Cluster workload. The `hpa` component is provider-neutral; the
+# `karpenter-nodepool-aws` component requires AWS EKS.
 #
 # This example shows:
 # - HorizontalPodAutoscaler targeting a Deployment (CPU-based autoscaling)
@@ -24,7 +26,7 @@ resources:
   - ../../components/serviceaccount
   - ../../components/pdb
   - ../../components/hpa
-  - ../../components/karpenter-nodepool
+  - ../../components/karpenter-nodepool-aws
 
 labels:
   - pairs:

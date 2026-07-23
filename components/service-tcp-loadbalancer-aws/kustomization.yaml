@@ -1,0 +1,16 @@
+# AWS wrapper (opt-in) around the provider-neutral `service-tcp-loadbalancer`
+# base. It only adds AWS load balancer controller annotations (NLB scheme,
+# cross-zone, ACM TLS termination); the Service itself — name, port, selector —
+# is the base's. Leaving AWS is swapping this path for the base's path: no
+# other manifest changes.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../service-tcp-loadbalancer
+
+patches:
+  - path: nlb-annotations.yaml
+    target:
+      kind: Service
+      name: -app-tcp

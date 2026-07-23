@@ -1,6 +1,11 @@
-# Scaling Example: HPA + Karpenter NodePool
+# Scaling Example: HPA + Karpenter NodePool (AWS-specific)
 
-This example demonstrates **horizontal pod autoscaling with just-in-time node provisioning** using:
+This example is **AWS-specific** — it composes the provider-neutral `hpa`
+component with the opt-in `karpenter-nodepool-aws` component (EC2NodeClass
+requires AWS EKS). On other substrates, consume `hpa` alone and use your
+platform's node autoscaling; see the Portability section of the root README.
+
+It demonstrates **horizontal pod autoscaling with just-in-time node provisioning** using:
 
 - **HPA** — scales pod replicas based on CPU utilization (70% target)
 - **Karpenter NodePool + EC2NodeClass** — provisions new EC2 nodes when pending pods can't be scheduled
@@ -81,12 +86,14 @@ For Pekko Cluster with `keep-majority` SBR, production `minReplicas` must be **�
 ## Testing
 
 ```bash
-kustomize build examples/scaling-hpa-karpenter
+kustomize build --load-restrictor LoadRestrictionsNone examples/scaling-hpa-karpenter-aws
 ```
 
 ## Infrastructure (Terraform)
 
-The Karpenter controller and prerequisites are provisioned via Terraform modules:
+The Karpenter controller and its prerequisites must exist before this example
+is useful. How you provision them is up to you — for example, with Terraform
+modules shaped like:
 
 ```hcl
 module "karpenter_prereqs" {

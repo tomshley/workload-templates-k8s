@@ -1,3 +1,8 @@
+# Abstract provider-neutral base: Karpenter NodePool policy only. This base
+# does not render a deployable NodePool on its own (its nodeClassRef is a
+# fail-closed placeholder); provider wrappers such as `karpenter-nodepool-aws`
+# compose it with their NodeClass kind. Contribute additional providers as
+# sibling `karpenter-nodepool-<provider>` wrappers over this base.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -9,4 +14,3 @@ labels:
 
 resources:
   - nodepool.yaml
-  - ec2nodeclass.yaml
