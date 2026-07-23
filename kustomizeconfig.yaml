@@ -3,7 +3,7 @@
 # This file teaches Kustomize how to rewrite cross-resource references
 # when namePrefix, nameSuffix, or name transformers are applied.
 #
-# Without this, a namePrefix like "egress-" would rename the ServiceAccount
+# Without this, a namePrefix like "orders-" would rename the ServiceAccount
 # but leave serviceAccountName in Deployments pointing to the old name.
 #
 # Usage:

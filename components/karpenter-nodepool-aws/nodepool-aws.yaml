@@ -1,0 +1,14 @@
+# Binds the neutral NodePool base to the AWS provider: EC2NodeClass reference
+# plus the EC2 instance-type requirement appended to the base's neutral list.
+- op: replace
+  path: /spec/template/spec/nodeClassRef/group
+  value: karpenter.k8s.aws
+- op: replace
+  path: /spec/template/spec/nodeClassRef/kind
+  value: EC2NodeClass
+- op: add
+  path: /spec/template/spec/requirements/-
+  value:
+    key: node.kubernetes.io/instance-type
+    operator: In
+    values: ["t3.medium", "t3a.medium"]
