@@ -46,6 +46,15 @@ Workloads compose components. Examples show how workloads and components combine
 
 `deployment-http` is **runtime-neutral** — no language-specific env vars, a single `http` port, probes targeting that port. Suitable for any HTTP service runtime (JVM, Python, Go, Node, …). JVM consumers without Pekko Cluster requirements add `JAVA_TOOL_OPTIONS` via a strategic-merge patch in their overlay (see [`CHANGELOG.md`](./CHANGELOG.md) for the patch recipe).
 
+`deployment-worker` is a **runtime-neutral, non-HTTP** long-running Deployment.
+It defaults to one replica with `Recreate`, exposes no ports or synthetic
+health endpoint, and relies on process exit for baseline liveness. Use it for
+queue consumers, pollers, reconcilers, and other continuously running workers;
+patch both replica count and update strategy when concurrent instances are
+known to be safe. These rollout defaults reduce planned overlap; they do not
+provide mutual exclusion. Work that requires a single owner must use an
+external lease, partition assignment, or fencing token.
+
 `pekko-cluster` is a **JVM/Pekko specialization** that bundles the defaults a Pekko Cluster service needs out of the box: JVM heap tuning, the Pekko Management port (7626), the remoting port (7355), Downward-API-driven `APP_LABEL` for contact-point discovery, and a longer cluster-leave grace period. Use it whenever your service participates in a Pekko Cluster.
 
 `stateful-service` is a **runtime-neutral** StatefulSet with a longer preStop grace period and Downward-API pod-identity env (`POD_NAME`, `POD_NAMESPACE`). Probes follow the repo-wide `/alive` + `/ready` convention.
@@ -71,6 +80,7 @@ The convention originates from Pekko Management's `HealthCheckRoutes` and is imp
 workloads/
   cron-job/               — CronJob template
   deployment-http/        — HTTP Deployment template
+  deployment-worker/      — Non-HTTP long-running worker Deployment
   pekko-cluster/          — Pekko Cluster Deployment template
   stateful-service/       — Generic StatefulSet template
 
@@ -115,8 +125,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.4.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.4.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v0.5.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v0.5.0
 ```
 
 Benefits:
@@ -129,7 +139,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.4.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v0.5.0
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
@@ -192,7 +202,7 @@ The `pekko-cluster` template exposes `APP_LABEL` as an env var for Pekko's conta
 
 ## Resource Customization
 
-Template resource defaults — `cpu: 500m`, `memory: 1Gi` / `2Gi` across all four workloads and a `startupProbe.failureThreshold` window of 120–150s on the three HTTP-serving workloads — are sized for JVM-class services. Lower-footprint runtimes (Python, Go, Node) typically tighten both the resource floor and (where applicable) the startup-probe window in their overlay. Consumers should adjust based on workload characteristics:
+Template resource defaults — `cpu: 500m`, `memory: 1Gi` / `2Gi` across all five workloads and a `startupProbe.failureThreshold` window of 120–150s on the three HTTP-serving workloads — are sized for JVM-class services. Lower-footprint runtimes (Python, Go, Node) typically tighten both the resource floor and (where applicable) the startup-probe window in their overlay. Consumers should adjust based on workload characteristics:
 
 - **replicas** — Scale for availability and throughput requirements
 - **CPU requests** — Size for steady-state processing needs  
