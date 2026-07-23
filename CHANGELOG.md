@@ -6,6 +6,22 @@ This project follows Semantic Versioning.
 
 ---
 
+## [Unreleased]
+
+Target version: `0.5.0`. Replace this heading with the actual publication date
+only when the immutable release tag is created.
+
+### Added
+
+- **`workloads/deployment-worker`** — runtime-neutral, non-HTTP, long-running
+  worker Deployment with one replica, `Recreate` updates, bounded memory,
+  graceful termination, and no invented network probes. Consumers that can
+  safely run concurrently may override both replicas and update strategy.
+  Singleton correctness remains the consumer's responsibility through an
+  external ownership or fencing mechanism; the rollout strategy is not a lock.
+
+---
+
 ## [0.4.0] - 2026-04-29
 
 ### Changed (BREAKING)
