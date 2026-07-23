@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: -app
+  labels:
+    app: app
+spec:
+  # ── Worker defaults: singleton, Recreate ──────────────────────────────────
+  # One replica with Recreate avoids deliberate old/new pod overlap during a
+  # Deployment rollout. It is deliberately conservative, but it is NOT a
+  # distributed lock: failures, forced deletion, or external controllers can
+  # still create overlapping execution. Work requiring exclusive ownership
+  # must use an external lease, partition assignment, or fencing token.
+  #
+  # Horizontally scalable, shard-safe workers (e.g. an idempotent consumer that
+  # partitions cleanly) override BOTH `replicas` and `strategy: RollingUpdate`
+  # in their overlay. This is the deliberate inverse of `deployment-http`, whose
+  # readiness-gated, stateless replicas default to RollingUpdate + 2.
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      serviceAccountName: -app
+      # Workers carry in-flight units of work (a batch, an in-progress message,
+      # an uncommitted offset). Give the process room to drain and commit on
+      # SIGTERM before the kubelet sends SIGKILL. Consumers whose unit of work
+      # runs longer than this raise it in their overlay.
+      terminationGracePeriodSeconds: 30
+      # No-op at the default replicas:1, but present for two reasons: (1) it
+      # spreads pods across nodes once a scalable worker overrides replicas, and
+      # (2) the library's kustomizeconfig labels fieldSpec expects this list to
+      # exist (consumer `app` labels are written into labelSelector). Soft
+      # constraint (ScheduleAnyway) so it never blocks scheduling.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: app
+      containers:
+        - name: app
+          image: PLACEHOLDER_IMAGE
+          imagePullPolicy: IfNotPresent
+          # ── Non-HTTP by design ────────────────────────────────────────────
+          # No Service, no container `ports`, and NO httpGet probes. A worker's
+          # liveness IS "the process is running" — the kubelet already restarts
+          # the container when the process exits, so this template ships no
+          # probes at all (an always-green httpGet on a process that serves no
+          # HTTP would be a lie, and a wrong-port probe would crash-loop a
+          # healthy pod). Workers that expose a real health signal add an `exec`
+          # or `tcpSocket` probe in their overlay. If you serve HTTP, you want
+          # `deployment-http`, not this template.
+          resources:
+            requests:
+              # Sized for a light I/O-bound worker; raise for CPU-bound work.
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              # CPU limit intentionally omitted (CFS-throttling avoidance — same
+              # rationale as the other workloads in this library). Only memory is
+              # capped, so a leak is bounded but steady-state CPU is burstable.
+              memory: "2Gi"

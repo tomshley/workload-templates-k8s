@@ -24,7 +24,7 @@ validate-kustomize:
     - apk add --no-cache curl
     # Install kustomize
     - |
-      KUSTOMIZE_VERSION=v5.3.0
+      KUSTOMIZE_VERSION=v5.5.0
       curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | tar xz -C /usr/local/bin
       chmod +x /usr/local/bin/kustomize
       kustomize version
@@ -34,7 +34,9 @@ validate-kustomize:
       set -e
       FAILED=0
       
-      # Validate all workloads
+      # Validate all workloads and components under the DEFAULT strict load
+      # restrictor: templates are consumed remotely via `?ref=` URLs, so CI
+      # must reject any template that reaches outside its own directory.
       for dir in workloads/*/; do
         if [ -f "${dir}kustomization.yaml" ]; then
           echo "Validating ${dir}..."
@@ -50,11 +52,18 @@ validate-kustomize:
         fi
       done
       
-      # Validate local-path examples (skip service-consumer which has remote URLs)
-      for dir in examples/pekko-cluster-dns-bootstrap examples/pekko-cluster-kubernetes-api-bootstrap examples/image-pull-secret; do
-        if [ -f "${dir}/kustomization.yaml" ]; then
+      # Validate every local-path example. service-consumer is documentation for
+      # remote consumption and deliberately uses illustrative URLs.
+      # Examples compose templates from a repository checkout, so loading
+      # `configurations: ../../kustomizeconfig.yaml` legitimately escapes each
+      # example root; LoadRestrictionsNone is therefore scoped to examples only.
+      for dir in examples/*/; do
+        if [ "$(basename "$dir")" = "service-consumer" ]; then
+          continue
+        fi
+        if [ -f "${dir}kustomization.yaml" ]; then
           echo "Validating ${dir}..."
-          kustomize build "$dir" > /dev/null || FAILED=1
+          kustomize build --load-restrictor LoadRestrictionsNone "$dir" > /dev/null || FAILED=1
         fi
       done
       
