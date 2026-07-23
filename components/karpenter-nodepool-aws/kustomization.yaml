@@ -1,0 +1,27 @@
+# AWS wrapper (opt-in) around the provider-neutral `karpenter-nodepool` base.
+# The base carries all neutral policy (capacity type, limits, consolidation);
+# this wrapper supplies the AWS provider's `EC2NodeClass`, points the base's
+# nodeClassRef at it, and appends the EC2 instance-type requirement. Other
+# providers follow the same shape as sibling `karpenter-nodepool-<provider>`
+# wrappers. Requires the AWS Karpenter provider; no neutral workload or
+# component depends on this.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+    includeTemplates: false
+
+resources:
+  - ../karpenter-nodepool
+  - ec2nodeclass.yaml
+
+patches:
+  - path: nodepool-aws.yaml
+    target:
+      group: karpenter.sh
+      version: v1
+      kind: NodePool
+      name: -default
