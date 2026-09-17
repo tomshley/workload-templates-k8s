@@ -6,6 +6,57 @@ This project follows Semantic Versioning.
 
 ---
 
+## [1.0.0] - 2026-09-16
+
+### Added
+
+- **`components/karpenter-nodepool-gcp`** — GCP wrapper over the
+  provider-neutral `karpenter-nodepool` base, mirroring the shape of
+  `karpenter-nodepool-aws`. Supplies a `GCENodeClass`
+  (`karpenter.k8s.gcp/v1alpha1`, from the
+  [GCP provider](https://github.com/cloudpilot-ai/karpenter-provider-gcp)),
+  binds the base's `nodeClassRef` to it, and appends the GCE instance-family
+  requirement. Image selection uses `alias: ContainerOptimizedOS@latest`,
+  accepted by every released provider version (v0.3.0 onward).
+  `karpenter.k8s.gcp/instance-family` matches the machine-type
+  prefix (`n2`, `n2d`), not the full family+shape. The default families and
+  the `pd-balanced` boot disk are a matched pair; N4-generation families take
+  Hyperdisk only, so an overlay that moves to them changes the disk too. The
+  node service account is a fail-closed placeholder patched per environment,
+  like the AWS wrapper's `role`. `kustomizeconfig.yaml` registers a
+  `GCENodeClass` nameReference so `namePrefix`/`nameSuffix` rewrite the
+  NodePool's `nodeClassRef.name` alongside the renamed NodeClass — the
+  wrapper is unusable under a prefix without it.
+- **`examples/scaling-hpa-karpenter-gcp`** — GCP sibling of
+  `examples/scaling-hpa-karpenter-aws`: the same HPA + Karpenter composition
+  on the `karpenter-nodepool-gcp` wrapper, including the per-environment
+  `serviceAccount` patch.
+
+### Changed (BREAKING)
+
+- **`components/connection-postgres` ConfigMap no longer defaults to
+  `localhost`/`postgres`.** `host` and `database` are now fail-closed
+  placeholders matching the component's `configmap.env.example`, so a consumer
+  that forgets to override them fails at startup instead of silently pointing
+  at a database that is not there. `port` keeps the universal `5432` default.
+  The Secret's `username`/`password` placeholders are now
+  `PLACEHOLDER_USERNAME`/`PLACEHOLDER_PASSWORD`, matching
+  `secret.env.example`; consumers overriding through `secretGenerator` or
+  patches are unaffected.
+
+  Migration: overlays that relied on the rendered defaults (a sidecar or
+  same-pod Postgres reached at `localhost`, or the `postgres` database) must
+  now set `host` and `database` explicitly, e.g. via `configMapGenerator`
+  with `behavior: merge` over `-db-config`.
+
+### Changed
+
+- **CI adapter `cicd-pipelines` pin `v0.5.5` → `v0.9.0`** with
+  `CICD_PIPELINES_RUNNER_TAG` `0.9.0`, aligning with the other Tomshley OSS
+  repositories.
+
+---
+
 ## [0.6.0] - 2026-07-23
 
 ### Changed (BREAKING)

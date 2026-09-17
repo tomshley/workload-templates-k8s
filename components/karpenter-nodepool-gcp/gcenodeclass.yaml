@@ -1,0 +1,45 @@
+# GCP NodeClass consumed by the `karpenter-nodepool-gcp` wrapper.
+#
+# Unlike the AWS wrapper, no network selector is needed: the provider derives
+# network interfaces from the cluster's own network config and always applies
+# the cluster-wide GKE node tag, so firewall rules keyed on the standard node
+# tag match without configuration. Overlays may add `spec.networkTags` when
+# pool-specific firewall rules require additional tags.
+#
+# The leading-hyphen name fails closed until an overlay supplies a real name,
+# exactly like every other resource in this library.
+apiVersion: karpenter.k8s.gcp/v1alpha1
+kind: GCENodeClass
+metadata:
+  name: -default
+spec:
+  # The node identity is a fail-closed placeholder, exactly like the AWS
+  # wrapper's `role`: the value satisfies the CRD's service-account pattern,
+  # so the API server admits the object, but no such account exists and GCE
+  # rejects the launch. Leaving the field unset is not a safer default — the
+  # provider would fall back to the controller's
+  # `DEFAULT_NODEPOOL_SERVICE_ACCOUNT` or, when that is unset too, the
+  # project's Compute Engine default service account (editor-equivalent).
+  # Overlays patch in a dedicated least-privilege node service account
+  # (`roles/container.nodeServiceAccount`).
+  serviceAccount: PLACEHOLDER_NODE_SERVICE_ACCOUNT@PLACEHOLDER_PROJECT.iam.gserviceaccount.com
+  # Container-Optimized OS, latest image — the same shape as the AWS wrapper's
+  # `al2023@latest`. `alias` is accepted by every provider release (v0.3.0
+  # onward, deprecated but valid from v0.4.0), so the wrapper admits on the
+  # provider version the Terraform controller module installs. Pin a version
+  # in an overlay (`ContainerOptimizedOS@<milestone.build.build.build>`) when
+  # you want to control when Karpenter drift rolls a new image. On provider
+  # v0.4.0+ an overlay may instead use `family: ContainerOptimizedOS` with
+  # `channel: cluster` to follow the cluster's GKE release channel; that path
+  # needs a release-channel-enrolled cluster and `container.clusters.list`
+  # on the controller role.
+  imageSelectorTerms:
+    - alias: ContainerOptimizedOS@latest
+  # `pd-balanced` pairs with the N2/N2D families in `nodepool-gcp.yaml`. The
+  # provider passes this category straight to the instance request, so a
+  # Hyperdisk-only family (N4 generation) would fail to launch against it —
+  # switch to `hyperdisk-balanced` in the same overlay that changes the family.
+  disks:
+    - category: pd-balanced
+      sizeGiB: 60
+      boot: true
