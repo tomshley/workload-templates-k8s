@@ -1,0 +1,23 @@
+# Binds the neutral NodePool base to the GCP provider: GCENodeClass reference
+# plus the GCE instance-family requirement appended to the base's neutral list.
+#
+# `karpenter.k8s.gcp/instance-family` matches the machine-type prefix (the part
+# before the first `-`), so the values are `n2`/`n2d`, never `n2-standard`.
+#
+# The families here and the boot disk in `gcenodeclass.yaml` are a matched
+# pair: N2/N2D take Persistent Disk (`pd-balanced`), while N4-generation
+# families (`n4`, `n4a`, `n4d`) take Hyperdisk only and reject every `pd-*`
+# category at instance creation. An overlay that changes one side must change
+# the other.
+- op: replace
+  path: /spec/template/spec/nodeClassRef/group
+  value: karpenter.k8s.gcp
+- op: replace
+  path: /spec/template/spec/nodeClassRef/kind
+  value: GCENodeClass
+- op: add
+  path: /spec/template/spec/requirements/-
+  value:
+    key: karpenter.k8s.gcp/instance-family
+    operator: In
+    values: ["n2", "n2d"]

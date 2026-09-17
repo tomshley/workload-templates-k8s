@@ -93,6 +93,7 @@ components/
   hpa/                    — HorizontalPodAutoscaler
   karpenter-nodepool/     — Karpenter NodePool policy (abstract base for provider wrappers)
   karpenter-nodepool-aws/ — AWS wrapper: EC2NodeClass + nodeClassRef binding
+  karpenter-nodepool-gcp/ — GCP wrapper: GCENodeClass + nodeClassRef binding
   pdb/                    — PodDisruptionBudget
   rbac-pod-reader/        — RBAC Role + RoleBinding for pod discovery
   service-headless-pekko-bootstrap/ — Headless Service for Pekko cluster bootstrapping
@@ -106,6 +107,7 @@ examples/
   pekko-cluster-dns-bootstrap/            — DNS-based Pekko Cluster bootstrap
   pekko-cluster-kubernetes-api-bootstrap/ — Kubernetes API-based Pekko Cluster bootstrap
   scaling-hpa-karpenter-aws/              — HPA + Karpenter NodePool autoscaling (AWS-specific)
+  scaling-hpa-karpenter-gcp/              — HPA + Karpenter NodePool autoscaling (GCP-specific)
   service-consumer/                       — Remote consumption patterns
 
 assets/
@@ -129,7 +131,8 @@ The core of this library is **provider-neutral by contract**:
 - **Provider-specific behavior ships as a thin, postfixed wrapper over a
   neutral base.** `service-tcp-loadbalancer-aws` adds AWS NLB/ACM annotations
   to the neutral `service-tcp-loadbalancer`; `karpenter-nodepool-aws` binds
-  the neutral `karpenter-nodepool` policy base to the AWS `EC2NodeClass`.
+  the neutral `karpenter-nodepool` policy base to the AWS `EC2NodeClass`, and
+  `karpenter-nodepool-gcp` binds the same base to the GCP `GCENodeClass`.
   Leaving a provider means swapping the wrapper path for the base's (or
   another provider's wrapper) — the base and everything layered on it stay
   put. Wrappers are opt-in leaves: nothing in `workloads/`, in a neutral
@@ -376,7 +379,7 @@ The `hpa` component provides a `HorizontalPodAutoscaler` that scales the Deploym
 
 The `kustomizeconfig.yaml` nameReference ensures `scaleTargetRef.name` is automatically rewritten when `namePrefix` is applied.
 
-### Karpenter NodePool (neutral base + AWS wrapper)
+### Karpenter NodePool (neutral base + provider wrappers)
 
 Karpenter splits across two components following the wrapper pattern from
 [Portability](#portability):
@@ -390,8 +393,19 @@ Karpenter splits across two components following the wrapper pattern from
   binds the base's `nodeClassRef` to it, and appends the EC2 instance-type
   requirement. When HPA scales pods beyond cluster capacity, Karpenter
   provisions new EC2 instances matching the NodePool constraints.
+- **`karpenter-nodepool-gcp`** — the GCP wrapper: supplies the `GCENodeClass`
+  (`karpenter.k8s.gcp/v1alpha1`, from the
+  [GCP provider](https://github.com/cloudpilot-ai/karpenter-provider-gcp)),
+  binds the base's `nodeClassRef` to it, and appends the GCE instance-family
+  requirement. Note `karpenter.k8s.gcp/instance-family` matches the
+  machine-type prefix (`n2`, `n2d`), not the full family+shape. The families
+  and the `GCENodeClass` boot disk are a matched pair: the default
+  `pd-balanced` suits N2/N2D, while N4-generation families take Hyperdisk
+  only — change both in the same overlay. The node service account is a
+  fail-closed placeholder patched per environment, like the AWS wrapper's
+  `role`.
 
-Other Karpenter providers (Azure, GCP, Cluster API, …) pair the same base
+Other Karpenter providers (Azure, Cluster API, …) pair the same base
 with their own NodeClass kind — sibling `karpenter-nodepool-<provider>`
 wrappers are welcome contributions. Substrates without a Karpenter provider
 use their platform's node autoscaling and consume the provider-neutral `hpa`
@@ -418,7 +432,26 @@ patches:
 
 Where `patches/ec2nodeclass-env.yaml` replaces `PLACEHOLDER_KARPENTER_NODE_ROLE` and `PLACEHOLDER_CLUSTER_NAME` with real values from your infrastructure outputs.
 
-See `examples/scaling-hpa-karpenter-aws/` for the complete pattern including HPA + Karpenter composition.
+**Prerequisites (GCP wrapper):**
+- Karpenter GCP provider controller installed in a GKE Standard cluster, with the controller IAM from the provider's `deploy/iam/karpenter-controller-role.yaml`
+- A dedicated least-privilege node service account (`roles/container.nodeServiceAccount`)
+
+**Required patches:** The GCENodeClass template's `serviceAccount` is a PLACEHOLDER that must be replaced per environment:
+
+```yaml
+# In your environment overlay
+patches:
+  - path: patches/gcenodeclass-env.yaml
+    target:
+      group: karpenter.k8s.gcp
+      version: v1alpha1
+      kind: GCENodeClass
+      name: my-service-default  # namePrefix + "-default"
+```
+
+Where `patches/gcenodeclass-env.yaml` sets `spec.serviceAccount` to the node service account email from your infrastructure outputs.
+
+See `examples/scaling-hpa-karpenter-aws/` and `examples/scaling-hpa-karpenter-gcp/` for the complete pattern including HPA + Karpenter composition.
 
 The `kustomizeconfig.yaml` nameReference ensures `nodeClassRef.name` in the NodePool is automatically rewritten when `namePrefix` is applied.
 

@@ -3,6 +3,11 @@ kind: EC2NodeClass
 metadata:
   name: -default
 spec:
+  # `al2023@latest` tracks the current EKS-optimized AL2023 AMI for the
+  # cluster's Kubernetes version, so the default resolves on every supported
+  # version. A dated pin (`al2023@vYYYYMMDD`) only exists for the Kubernetes
+  # versions that were current on that date, so pin in an overlay — when you
+  # want to control when Karpenter drift rolls a new image — not here.
   amiSelectorTerms:
     - alias: al2023@latest
   role: PLACEHOLDER_KARPENTER_NODE_ROLE
