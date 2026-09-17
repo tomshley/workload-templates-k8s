@@ -1,0 +1,56 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Example (GCP-specific): HPA + Karpenter NodePool scaling for a Pekko
+# Cluster workload. The `hpa` component is provider-neutral; the
+# `karpenter-nodepool-gcp` component requires GKE Standard with the GCP
+# Karpenter provider.
+#
+# This example shows:
+# - HorizontalPodAutoscaler targeting a Deployment (CPU-based autoscaling)
+# - Karpenter NodePool + GCENodeClass for just-in-time node provisioning (GCP)
+# - namePrefix rewriting for HPA scaleTargetRef and NodePool nodeClassRef
+# - Environment-specific patching pattern for the GCENodeClass PLACEHOLDER
+#
+# Consumers MUST patch the GCENodeClass `serviceAccount` PLACEHOLDER in their
+# environment overlays:
+#   - PLACEHOLDER_NODE_SERVICE_ACCOUNT@PLACEHOLDER_PROJECT.iam.gserviceaccount.com
+#       → dedicated node service account email
+#
+# An overlay may also patch the image selector term (pin an alias version, or
+# `family`/`channel` on provider v0.4.0+), the boot disk, or the
+# instance-family requirement — the family and disk pair must change together
+# (see the component's comments).
+
+configurations:
+  - ../../kustomizeconfig.yaml
+
+namePrefix: my-service
+
+resources:
+  - ../../workloads/pekko-cluster
+  - ../../components/rbac-pod-reader
+  - ../../components/serviceaccount
+  - ../../components/pdb
+  - ../../components/hpa
+  - ../../components/karpenter-nodepool-gcp
+
+labels:
+  - pairs:
+      app: my-service
+    includeSelectors: true
+
+images:
+  - name: PLACEHOLDER_IMAGE
+    newName: registry.example.com/my-org/my-service
+    newTag: "1.0.0"
+
+# Patch the GCENodeClass PLACEHOLDER with environment-specific values
+# In a real service, these patches live in the environment overlay (staging/prod)
+patches:
+  - path: patches/gcenodeclass-env.yaml
+    target:
+      group: karpenter.k8s.gcp
+      version: v1alpha1
+      kind: GCENodeClass
+      name: -default
