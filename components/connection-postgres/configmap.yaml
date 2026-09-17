@@ -3,6 +3,6 @@ kind: ConfigMap
 metadata:
   name: -db-config
 data:
-  host: "localhost"
+  host: "PLACEHOLDER_HOST"
   port: "5432"
-  database: "postgres"
+  database: "PLACEHOLDER_DATABASE"

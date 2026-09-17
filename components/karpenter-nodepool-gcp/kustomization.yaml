@@ -1,0 +1,27 @@
+# GCP wrapper (opt-in) around the provider-neutral `karpenter-nodepool` base.
+# The base carries all neutral policy (capacity type, limits, consolidation);
+# this wrapper supplies the GCP provider's `GCENodeClass`, points the base's
+# nodeClassRef at it, and appends the GCE instance-family requirement. Mirrors
+# the shape of the sibling `karpenter-nodepool-aws` wrapper. Requires the GCP
+# Karpenter provider (github.com/cloudpilot-ai/karpenter-provider-gcp); no
+# neutral workload or component depends on this.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+    includeTemplates: false
+
+resources:
+  - ../karpenter-nodepool
+  - gcenodeclass.yaml
+
+patches:
+  - path: nodepool-gcp.yaml
+    target:
+      group: karpenter.sh
+      version: v1
+      kind: NodePool
+      name: -default

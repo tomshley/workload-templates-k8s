@@ -74,6 +74,12 @@ nameReference:
       - path: spec/template/spec/nodeClassRef/name
         kind: NodePool
 
+  # GCENodeClass references (NodePool → GCENodeClass)
+  - kind: GCENodeClass
+    fieldSpecs:
+      - path: spec/template/spec/nodeClassRef/name
+        kind: NodePool
+
   # Role references (RoleBinding → Role)
   - kind: Role
     fieldSpecs:
