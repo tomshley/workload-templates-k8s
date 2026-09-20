@@ -1,3 +1,33 @@
+# Headless Service for the Pekko cluster: bootstrap discovery plus, for
+# workloads that serve gRPC, the per-pod endpoint set for client-side
+# load balancing.
+#
+# clusterIP: None makes DNS return one A record per pod so seed discovery
+# sees every member and gRPC clients can enumerate every endpoint.
+#
+# publishNotReadyAddresses MUST be true for bootstrap correctness: a node
+# is not ready until it has joined a cluster, and it cannot join until it
+# can discover its peers — publishing only ready addresses deadlocks
+# DNS-based formation. The field is service-wide with no per-port control,
+# so a consumer that serves request traffic from this Service AND does not
+# rely on DNS-based bootstrap discovery should patch it to false in its own
+# overlay: a pod listening on the gRPC port that has not passed readiness
+# has not joined the cluster, and routing requests to it times out on its
+# cluster calls rather than refusing fast. Consumers using the default
+# discovery-method = kubernetes-api (Kubernetes API label-selector
+# queries) do not use this Service for discovery and can patch safely.
+#
+# gRPC balancing itself is client-side — this Service provides per-pod
+# DNS only, it does not balance. A pekko-grpc client needs
+# service-discovery.mechanism = "pekko-dns" plus
+# load-balancing-policy = "round_robin"; the static and grpc-dns
+# mechanisms resolve a single address per lookup
+# (GrpcClientSettings.fromConfig maps both to
+# staticServiceDiscovery — one ResolvedTarget) and cannot balance.
+# pekko-grpc has no service-discovery.refresh-interval key; re-resolution
+# comes from grpc-java calling the resolver's refresh() on connection
+# breakage, bounded by DNS TTL. A non-Pekko gRPC client must supply its
+# own client-side load balancing.
 apiVersion: v1
 kind: Service
 metadata:
@@ -17,4 +47,8 @@ spec:
     - name: management
       port: 7626
       targetPort: management
+      protocol: TCP
+    - name: grpc
+      port: 9900
+      targetPort: grpc
       protocol: TCP
