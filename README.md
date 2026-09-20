@@ -164,8 +164,8 @@ See `examples/service-consumer/` for a complete example of how service repositor
 
 ```yaml
 resources:
-  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v1.0.0
-  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//workloads/pekko-cluster?ref=v1.1.0
+  - https://gitlab.com/your-org/workload-templates-k8s//components/serviceaccount?ref=v1.1.0
 ```
 
 Benefits:
@@ -178,7 +178,7 @@ Benefits:
 
 ```yaml
 configurations:
-  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v1.0.0
+  - https://gitlab.com/your-org/workload-templates-k8s//kustomizeconfig.yaml?ref=v1.1.0
 ```
 
 This ensures cross-resource references (ServiceAccount, Service, Secret, Role) are automatically rewritten when names are transformed. Without it, `namePrefix` may rename resources but leave internal references pointing to the old names, causing runtime failures.
@@ -339,6 +339,14 @@ The template's `replicas: 3` default supports majority-based split-brain resolut
 - The `keep-majority` strategy is recommended for Kubernetes deployments
 
 See [Pekko Split Brain Resolver documentation](https://pekko.apache.org/docs/pekko/current/split-brain-resolver.html) for detailed configuration options.
+
+### gRPC
+
+The `pekko-cluster` Deployment declares container port `grpc`/9900 and the `-app-bootstrap` headless Service publishes it, so DNS returns one A record per pod — the endpoint set client-side balancing needs. Declaring a container port is informational and opens nothing, so workloads that serve no gRPC are unaffected.
+
+The Service provides per-pod DNS only — it does not by itself load balance. Balancing requires a pekko-grpc client configured with `service-discovery.mechanism = "pekko-dns"` and `load-balancing-policy = "round_robin"`. The `static` and `grpc-dns` mechanisms resolve a single address per lookup (`GrpcClientSettings.fromConfig` maps both to `staticServiceDiscovery`, a single `ResolvedTarget`) and cannot balance. pekko-grpc has no `service-discovery.refresh-interval` key — re-resolution comes from grpc-java calling the resolver's `refresh()` on connection breakage, bounded by DNS TTL. A non-Pekko gRPC client must supply its own client-side load balancing.
+
+The Service keeps `publishNotReadyAddresses: true` because DNS-based bootstrap needs not-ready addresses or formation deadlocks. The field is service-wide with no per-port control, so a consumer that serves request traffic from this Service AND does not rely on DNS-based bootstrap discovery should patch it to `false` in its own overlay — a pod listening on the gRPC port that has not passed readiness has not joined the cluster, and routing requests to it times out on its cluster calls rather than refusing fast. The `kubernetes-api` discovery method — the default — queries the Kubernetes API by label selector, does not use this Service, and can patch safely.
 
 ### PDB and Replica Count Interaction
 
