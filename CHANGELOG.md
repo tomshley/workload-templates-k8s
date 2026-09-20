@@ -6,7 +6,7 @@ This project follows Semantic Versioning.
 
 ---
 
-## [Unreleased]
+## [1.1.0] - 2026-09-19
 
 ### Added
 
