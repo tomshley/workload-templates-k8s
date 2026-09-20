@@ -1,5 +1,18 @@
 # GCP NodeClass consumed by the `karpenter-nodepool-gcp` wrapper.
 #
+# PRECONDITION — this class cannot launch a node until the controller's
+# template node pools exist. Where the AWS provider launches from an instance
+# profile plus karpenter.sh/discovery tags, the GCP provider launches from the
+# instance template of a node pool it manages itself: `karpenter-default` on
+# Container-Optimized OS and `karpenter-ubuntu`, with ARM64 variants attempted
+# best-effort. It creates them at startup, so nothing has to be provisioned
+# out-of-band. What does matter is where it looks for them — it addresses the
+# cluster by the node location it is configured with, and a value that is not
+# the cluster's own GKE location makes every template-pool call return 404 and
+# retry indefinitely. This class still admits cleanly into the API server in
+# that state and simply never launches a node, so read the controller's
+# node-pool template logs before suspecting the class itself.
+#
 # Unlike the AWS wrapper, no network selector is needed: the provider derives
 # network interfaces from the cluster's own network config and always applies
 # the cluster-wide GKE node tag, so firewall rules keyed on the standard node
