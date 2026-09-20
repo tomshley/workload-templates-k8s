@@ -6,6 +6,25 @@ This project follows Semantic Versioning.
 
 ---
 
+## [1.1.1] - 2026-09-20
+
+### Changed
+
+- **`components/karpenter-nodepool-gcp`** — the GCENodeClass header now
+  explains what this class depends on to launch a node. The GCP provider
+  launches from the instance template of a node pool it manages itself
+  (`karpenter-default`, `karpenter-ubuntu`, and best-effort ARM64
+  variants) rather than from an instance profile plus discovery tags as on
+  AWS, and it creates those pools at startup — so nothing is provisioned
+  out-of-band. The header instead names the failure that does occur: the
+  controller addresses the cluster by its configured node location, and a
+  value other than the cluster's own GKE location makes every
+  template-pool call 404 and retry indefinitely while this class keeps
+  admitting cleanly and never launches. Documentation only; no manifest
+  change.
+
+---
+
 ## [1.1.0] - 2026-09-19
 
 ### Added
