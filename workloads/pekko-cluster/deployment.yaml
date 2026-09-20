@@ -45,6 +45,11 @@ spec:
             - name: management
               containerPort: 7626
               protocol: TCP
+            # Declaring a container port is informational — it opens
+            # nothing and is inert for workloads that serve no gRPC.
+            - name: grpc
+              containerPort: 9900
+              protocol: TCP
           env:
             - name: NAMESPACE
               valueFrom:
