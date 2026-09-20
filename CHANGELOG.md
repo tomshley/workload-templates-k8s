@@ -6,6 +6,34 @@ This project follows Semantic Versioning.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **gRPC support in the Pekko family** — `workloads/pekko-cluster` now
+  declares container port `grpc` (9900/TCP) alongside remoting and
+  management, and `service-headless-pekko-bootstrap` publishes that port
+  on its headless Service, so DNS returns one A record per pod. That
+  endpoint set is what a client-side `round_robin` policy needs to spread
+  gRPC calls across all pods; a ClusterIP Service leaves kube-proxy
+  balancing connections, which gRPC's multiplexed long-lived HTTP/2
+  defeats. Declaring a container port is informational and opens nothing,
+  so workloads that serve no gRPC are unaffected. The Service provides
+  per-pod DNS only — it does not itself balance; balancing requires a
+  pekko-grpc client configured with
+  `service-discovery.mechanism = "pekko-dns"` and
+  `load-balancing-policy = "round_robin"` (`static` and `grpc-dns` resolve
+  a single address and cannot balance; non-Pekko clients must supply
+  their own client-side load balancing).
+- **Consumer readiness note** — the bootstrap Service keeps
+  `publishNotReadyAddresses: true` because DNS-based bootstrap needs
+  not-ready addresses or formation deadlocks. The field is service-wide,
+  so a consumer that serves request traffic from this Service AND does
+  not rely on DNS-based bootstrap discovery should patch it to `false` in
+  its own overlay — requests must never reach a pod that has not passed
+  readiness. The default `kubernetes-api` discovery method does not use
+  this Service and can patch safely.
+
 ## [1.0.0] - 2026-09-16
 
 ### Added
