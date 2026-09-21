@@ -1,23 +1,37 @@
 # GCP NodeClass consumed by the `karpenter-nodepool-gcp` wrapper.
 #
-# PRECONDITION — this class cannot launch a node until the controller's
-# template node pools exist. Where the AWS provider launches from an instance
-# profile plus karpenter.sh/discovery tags, the GCP provider launches from the
-# instance template of a node pool it manages itself: `karpenter-default` on
-# Container-Optimized OS and `karpenter-ubuntu`, with ARM64 variants attempted
-# best-effort. It creates them at startup, so nothing has to be provisioned
-# out-of-band. What does matter is where it looks for them — it addresses the
-# cluster by the node location it is configured with, and a value that is not
-# the cluster's own GKE location makes every template-pool call return 404 and
-# retry indefinitely. This class still admits cleanly into the API server in
-# that state and simply never launches a node, so read the controller's
-# node-pool template logs before suspecting the class itself.
+# Requires the GCP Karpenter provider at v0.4.0 or later — the structured
+# imageSelectorTerms below and the cluster-id-bearing node tag both exist only
+# from that release. On an older provider this class is rejected at admission
+# or provisions nodes the cluster's auto-created firewall rules do not cover.
+#
+# PRECONDITION — an existing RUNNING node pool must be present for the
+# controller to bootstrap from. Where the AWS provider launches from an
+# instance profile plus karpenter.sh/discovery tags, the GCP provider reads
+# bootstrap metadata from the instance template of a pool that already exists
+# in the cluster: `default-pool` if present, else the first RUNNING pool in
+# alphabetical order, else a `karpenter-fallback` pool it creates itself.
+# Alphabetical discovery is incidental, not a contract — a cluster whose pools
+# sort so that an ARM64 or otherwise unrepresentative pool comes first will
+# silently bootstrap from it. The controller module's
+# `bootstrap_node_pool_name` setting makes the choice deterministic. What does
+# matter in every case is where the controller looks: it addresses the cluster
+# by the node location it is configured with, and a value that is not the
+# cluster's own GKE location makes every node-pool call return 404 and retry
+# indefinitely. This class still admits cleanly into the API server in that
+# state and simply never launches a node, so read the controller's bootstrap
+# pool logs before suspecting the class itself.
 #
 # Unlike the AWS wrapper, no network selector is needed: the provider derives
-# network interfaces from the cluster's own network config and always applies
-# the cluster-wide GKE node tag, so firewall rules keyed on the standard node
-# tag match without configuration. Overlays may add `spec.networkTags` when
-# pool-specific firewall rules require additional tags.
+# network interfaces from the cluster's own network config. For firewall
+# coverage it emits two tags on every node — the generic
+# `gke-<cluster-name>-node` and the cluster-id-bearing
+# `gke-<cluster-name>-<cluster-id[:8]>-node` that GKE's auto-created firewall
+# rules actually target. Providers before v0.4.0 emitted only the generic tag,
+# which no auto-created rule matches, so nodes joined but were unreachable by
+# the control plane. Overlays may add `spec.networkTags` when pool-specific
+# firewall rules require additional tags — the field is appended after the two
+# derived tags, never replacing them, so setting it cannot strip the coverage.
 #
 # The leading-hyphen name fails closed until an overlay supplies a real name,
 # exactly like every other resource in this library.
@@ -36,18 +50,25 @@ spec:
   # Overlays patch in a dedicated least-privilege node service account
   # (`roles/container.nodeServiceAccount`).
   serviceAccount: PLACEHOLDER_NODE_SERVICE_ACCOUNT@PLACEHOLDER_PROJECT.iam.gserviceaccount.com
-  # Container-Optimized OS, latest image — the same shape as the AWS wrapper's
-  # `al2023@latest`. `alias` is accepted by every provider release (v0.3.0
-  # onward, deprecated but valid from v0.4.0), so the wrapper admits on the
-  # provider version the Terraform controller module installs. Pin a version
-  # in an overlay (`ContainerOptimizedOS@<milestone.build.build.build>`) when
-  # you want to control when Karpenter drift rolls a new image. On provider
-  # v0.4.0+ an overlay may instead use `family: ContainerOptimizedOS` with
-  # `channel: cluster` to follow the cluster's GKE release channel; that path
-  # needs a release-channel-enrolled cluster and `container.clusters.list`
-  # on the controller role.
+  # Container-Optimized OS following the cluster's enrolled GKE release
+  # channel. The syntax deliberately diverges from the AWS wrapper's
+  # `al2023@latest` so that the behaviour matches: that alias is scoped to the
+  # cluster's Kubernetes version and structurally cannot return an image for
+  # a different one, while this provider's deprecated `alias: ...@latest`
+  # meant newest-in-catalog with no reference to the cluster — it re-listed
+  # the image catalog on every reconcile (a metered, quota-bearing filtered
+  # list) and could resolve an image from a newer GKE build than the cluster
+  # runs. `channel: cluster` instead resolves the enrolled channel's build
+  # for the cluster's own minor version through a 30-minute-cached
+  # getServerConfig call, then looks up the exact image by a narrow
+  # name-prefix filter. Two preconditions: the cluster must be enrolled in a
+  # release channel, and the controller role needs `container.clusters.list`.
+  # `channel` is only valid with `family: ContainerOptimizedOS`; an overlay
+  # wanting a pinned image uses `version:` instead (mutually exclusive with
+  # `channel`).
   imageSelectorTerms:
-    - alias: ContainerOptimizedOS@latest
+    - family: ContainerOptimizedOS
+      channel: cluster
   # `pd-balanced` pairs with the N2/N2D families in `nodepool-gcp.yaml`. The
   # provider passes this category straight to the instance request, so a
   # Hyperdisk-only family (N4 generation) would fail to launch against it —
