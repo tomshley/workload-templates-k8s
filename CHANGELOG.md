@@ -6,6 +6,39 @@ This project follows Semantic Versioning.
 
 ---
 
+## [1.2.0] - 2026-09-21
+
+### Changed
+
+- **`components/karpenter-nodepool-gcp`** — the GCENodeClass now selects its
+  image by `family: ContainerOptimizedOS` with `channel: cluster`, following
+  the release channel the cluster is enrolled in. The previous
+  `alias: ContainerOptimizedOS@latest` resolved the newest image in the GKE
+  catalog regardless of the cluster's build and re-listed the catalog (a
+  metered, filtered list) on every reconcile; the channel form resolves the
+  enrolled channel's build for the cluster's minor version through a cached
+  server-config call. The syntax deliberately diverges from the AWS
+  component's `al2023@latest` so the behaviour matches — that alias is
+  scoped to the cluster's Kubernetes version while the GCP `@latest` was
+  not. **Requires the GCP Karpenter provider at v0.4.0 or later**: on older
+  providers the structured terms are rejected at admission, so consume this
+  component together with a controller module that installs v0.4.0+. The
+  header also corrects two claims that held only before v0.4.0 — that the
+  controller creates its own template node pools (it now bootstraps from an
+  existing RUNNING pool, discovered alphabetically unless the controller's
+  bootstrap pool name is pinned) and that the generic GKE node tag matches
+  the auto-created firewall rules (nodes now also carry the cluster-id-
+  bearing tag those rules actually target).
+
+### Added
+
+- **`components/karpenter-nodepool-gcp`** — the NodePool header documents
+  the GCE instance-name ceiling: `"karpenter-"` + NodePool name + `"-"` +
+  5-char generated suffix must fit in 63 characters, so the rendered
+  NodePool name (after `namePrefix`) must be <= 47. Longer names admit
+  cleanly and then fail at instance insert, presenting as a pool that never
+  launches.
+
 ## [1.1.1] - 2026-09-20
 
 ### Changed
