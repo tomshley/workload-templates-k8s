@@ -9,6 +9,18 @@
 # families (`n4`, `n4a`, `n4d`) take Hyperdisk only and reject every `pd-*`
 # category at instance creation. An overlay that changes one side must change
 # the other.
+#
+# NodePool names have a hard ceiling that arrives through the GCE instance
+# name, not through any Kubernetes validation:
+#
+#   instance name = "karpenter-" + <NodePool name> + "-" + <5-char generated
+#                   suffix>
+#
+# GCE instance names are capped at 63 characters, so the NodePool name must
+# be <= 47. A longer name admits into the API server without complaint and
+# then fails at instance insert, presenting as a NodePool that simply never
+# launches anything. The provider validates nothing here, so the limit lives
+# in this comment — count the rendered name after namePrefix, not the base.
 - op: replace
   path: /spec/template/spec/nodeClassRef/group
   value: karpenter.k8s.gcp
