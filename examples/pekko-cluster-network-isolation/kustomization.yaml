@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../workloads/pekko-cluster
+  - ../../components/service-headless-pekko-bootstrap
+  - ../../components/serviceaccount
+  - ../../components/pdb
+  - ../../components/networkpolicy-default-deny-ingress
+  - ../../components/networkpolicy-pekko-cluster-peering
+
+configurations:
+  - ../../kustomizeconfig.yaml
+
+namePrefix: pekko-isolated
+
+labels:
+  - pairs:
+      app: pekko-isolated
+    includeSelectors: true
+
+images:
+  - name: PLACEHOLDER_IMAGE
+    newName: registry.example.com/example/pekko-isolated
+    newTag: "1.0.0"

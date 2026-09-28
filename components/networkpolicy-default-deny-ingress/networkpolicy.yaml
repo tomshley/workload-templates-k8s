@@ -1,0 +1,38 @@
+# Deny-all ingress baseline for the namespace.
+#
+# podSelector: {} selects EVERY pod in the namespace. With no labels to
+# match, a consumer's `labels` transform leaves the selector empty — it adds
+# only metadata labels — so nothing is exempted accidentally. Intended
+# callers get traffic back through their own additive NetworkPolicy (see
+# networkpolicy-pekko-cluster-peering for Pekko cluster workloads): policies
+# union, so an allow rule anywhere reopens exactly the declared path and
+# nothing else.
+#
+# The scope is the namespace, not the workload whose overlay renders it.
+# Include it in every overlay that relies on the baseline: the overlay's
+# namePrefix gives each copy a distinct name, so the copies coexist as
+# separate objects carrying the same rule — their union is the same deny,
+# and deleting one workload's resources never lifts the baseline from the
+# workloads that remain. Two overlays in one namespace must not render the
+# same name: they would share one object, and pruning either would delete
+# it.
+#
+# policyTypes is Ingress only: egress stays unrestricted, so DNS, the
+# Kubernetes API, databases, brokers, and outbound tunnels keep working.
+#
+# Enforcement is delegated to the network plugin: Calico, Cilium (including
+# GKE Dataplane V2), or the AWS VPC CNI with network-policy enforcement
+# enabled bind this traffic; on a cluster without policy enforcement the
+# manifest has no effect but still records the intended flow. The
+# NetworkPolicy API always admits connections from the pod's own node, so
+# kubelet probes keep working; kubectl exec and port-forward are carried by
+# the kubelet and container runtime rather than the pod network, so they
+# are unaffected too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: -default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
