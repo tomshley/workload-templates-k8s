@@ -6,6 +6,40 @@ This project follows Semantic Versioning.
 
 ---
 
+## [1.3.0] - 2026-09-28
+
+### Added
+
+- **`components/networkpolicy-default-deny-ingress`** — a namespace-wide
+  deny-all ingress baseline using only the core `networking.k8s.io/v1`
+  NetworkPolicy API. `podSelector: {}` selects every pod in the namespace
+  with `policyTypes: [Ingress]` and no rules; intended callers are restored
+  through additive allow policies, which union with the deny rather than
+  weaken it. Egress is untouched, so DNS, the Kubernetes API, databases,
+  and brokers keep working, and traffic from a pod's own node is always
+  admitted, so kubelet probes, `kubectl exec`, and `port-forward` are
+  unaffected. The baseline binds traffic on any cluster whose network
+  plugin enforces NetworkPolicy and is inert elsewhere.
+- **`components/networkpolicy-pekko-cluster-peering`** — the counterpart
+  allow that reopens only the Pekko cluster data plane: remoting (7355)
+  and management (7626) between pods carrying the workload's `app` label
+  in the same namespace. The application request port is deliberately not
+  opened; a consumer names its callers in its own allow policy. The
+  `podSelector` and peer `podSelector` carry the `app: app` placeholder
+  so the standard `labels` transform with `includeSelectors` rewrites
+  both to the real workload label.
+- **`examples/pekko-cluster-network-isolation`** — composes both
+  NetworkPolicy components with the `pekko-cluster` workload, headless
+  bootstrap service, service account, and PDB under one `namePrefix` and
+  label transform.
+- **README** — a Network Isolation section covering enforcement plugins,
+  the per-overlay copy model (each overlay's `namePrefix` yields a
+  coexisting object, so deleting one workload never lifts the baseline),
+  admission through Services and ingress controllers, and the `ipBlock`
+  requirement for `LoadBalancer` traffic.
+
+---
+
 ## [1.2.0] - 2026-09-21
 
 ### Changed
