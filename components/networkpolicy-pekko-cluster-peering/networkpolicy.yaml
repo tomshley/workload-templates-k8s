@@ -1,0 +1,40 @@
+# Pekko cluster peering allow — the counterpart to
+# networkpolicy-default-deny-ingress.
+#
+# Pods selected here (the workload's `app` label, which every template in
+# this repository stamps as `app: app` before consumer transforms rename it)
+# may receive remoting (7355) and management (7626) traffic only from pods
+# carrying the same label in the same namespace. Cluster formation, gossip,
+# and the bootstrap contact-point checks ride these ports; a default-deny
+# without this allow leaves every member unable to join.
+#
+# The application request port (gRPC 9900, HTTP, …) is deliberately NOT
+# opened here: the caller identity is consumer policy, so the caller's
+# allow rule lives in the consumer's own overlay.
+#
+# Both selectors carry the `app: app` placeholder the same way Service
+# selectors do — a consumer's `labels` transform with includeSelectors
+# rewrites spec.podSelector AND spec.ingress[].from[].podSelector together,
+# so the peer rule always names the same real label value as the workload.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: -app-pekko-cluster-peering
+  labels:
+    app: app
+spec:
+  podSelector:
+    matchLabels:
+      app: app
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: app
+      ports:
+        - port: remoting
+          protocol: TCP
+        - port: management
+          protocol: TCP

@@ -16,7 +16,7 @@ It provides reusable Kubernetes templates consumed by application repositories f
 Tomshley Workload Templates provides a small, opinionated set of **Kubernetes manifest templates** designed to act as stable foundations for:
 
 - Application workloads (Deployments, StatefulSets, CronJobs)
-- Shared infrastructure components (Services, PDBs, RBAC, ServiceAccounts)
+- Shared infrastructure components (Services, PDBs, RBAC, ServiceAccounts, NetworkPolicies)
 - Reference examples (e.g. Pekko Cluster bootstrapping patterns)
 
 The project prioritizes correctness, minimalism, composability, and long-term maintainability.
@@ -38,7 +38,7 @@ The project prioritizes correctness, minimalism, composability, and long-term ma
 The repository is organized around two orthogonal axes:
 
 1. **Workloads** — complete deployment patterns (Deployment, StatefulSet, CronJob)
-2. **Components** — reusable supporting resources (Services, PDBs, RBAC, ServiceAccounts)
+2. **Components** — reusable supporting resources (Services, PDBs, RBAC, ServiceAccounts, NetworkPolicies)
 
 Workloads compose components. Examples show how workloads and components combine for specific use cases.
 
@@ -94,6 +94,8 @@ components/
   karpenter-nodepool/     — Karpenter NodePool policy (abstract base for provider wrappers)
   karpenter-nodepool-aws/ — AWS wrapper: EC2NodeClass + nodeClassRef binding
   karpenter-nodepool-gcp/ — GCP wrapper: GCENodeClass + nodeClassRef binding
+  networkpolicy-default-deny-ingress/  — Deny-all ingress NetworkPolicy baseline for the namespace
+  networkpolicy-pekko-cluster-peering/ — Pekko remoting/management allow between same-app pods
   pdb/                    — PodDisruptionBudget
   rbac-pod-reader/        — RBAC Role + RoleBinding for pod discovery
   service-headless-pekko-bootstrap/ — Headless Service for Pekko cluster bootstrapping
@@ -106,9 +108,11 @@ examples/
   image-pull-secret/                      — imagePullSecrets patch pattern
   pekko-cluster-dns-bootstrap/            — DNS-based Pekko Cluster bootstrap
   pekko-cluster-kubernetes-api-bootstrap/ — Kubernetes API-based Pekko Cluster bootstrap
+  pekko-cluster-network-isolation/        — Default-deny ingress + Pekko cluster peering allow
   scaling-hpa-karpenter-aws/              — HPA + Karpenter NodePool autoscaling (AWS-specific)
   scaling-hpa-karpenter-gcp/              — HPA + Karpenter NodePool autoscaling (GCP-specific)
   service-consumer/                       — Remote consumption patterns
+  worker-consumer/                        — Non-HTTP worker Deployment + ServiceAccount composition
 
 assets/
   brand/
@@ -125,9 +129,9 @@ The core of this library is **provider-neutral by contract**:
 
 - **Workloads and unpostfixed components target any conformant Kubernetes** —
   k3s, kind, bare-metal kubeadm, and every managed offering alike. They use
-  only stable core APIs (`apps/v1`, `autoscaling/v2`, `policy/v1`, RBAC) and
-  never require a cloud-specific controller, CRD, storage class, or
-  annotation to render and run.
+  only stable core APIs (`apps/v1`, `autoscaling/v2`, `policy/v1`,
+  `networking.k8s.io/v1`, RBAC) and never require a cloud-specific
+  controller, CRD, storage class, or annotation to render and run.
 - **Provider-specific behavior ships as a thin, postfixed wrapper over a
   neutral base.** `service-tcp-loadbalancer-aws` adds AWS NLB/ACM annotations
   to the neutral `service-tcp-loadbalancer`; `karpenter-nodepool-aws` binds
@@ -211,6 +215,7 @@ Kustomize propagates labels to:
 - `spec.selector.matchLabels` on Deployments, StatefulSets, PDBs
 - `spec.template.metadata.labels` on pod templates
 - `spec.selector` on Services
+- `spec.podSelector` and ingress peer `podSelector` on NetworkPolicies (an empty `podSelector: {}` stays empty)
 
 This ensures consistent identity across all composed resources without manual patching.
 
@@ -319,6 +324,56 @@ The secret name (`my-registry-credentials`) must match:
 2. The `K8S_IMAGE_PULL_SECRET` value in your `.secure_files/.env` (if using GitLab CI)
 
 CI creates the Secret from registry credentials before deploying. Your Kustomize overlay references it.
+
+---
+
+## Network Isolation
+
+Two components implement a standard ingress boundary using only the core
+`networking.k8s.io/v1` NetworkPolicy API. They bind traffic on any cluster
+whose network plugin enforces NetworkPolicy — Calico, Cilium (including GKE
+Dataplane V2), or the AWS VPC CNI with network-policy enforcement enabled —
+and have no effect on a cluster without one; the manifests still record the
+intended flow.
+
+- **`networkpolicy-default-deny-ingress`** selects every pod in the namespace
+  (`podSelector: {}`) with `policyTypes: [Ingress]` and no rules: all inbound
+  pod traffic is denied unless another policy reopens it. NetworkPolicies
+  union, so each intended caller is restored by an additive allow — nothing
+  is ever re-widened by accident. Egress is untouched: DNS, the Kubernetes
+  API, databases, brokers, and outbound tunnels keep working. The
+  NetworkPolicy API always admits connections from the pod's own node, so
+  kubelet probes keep working.
+- **`networkpolicy-pekko-cluster-peering`** reopens only the Pekko cluster
+  data plane: remoting (7355) and management (7626) between pods in the same
+  namespace carrying the workload's `app` label. Without it a default-deny
+  leaves a `pekko-cluster` workload unable to form. The application request
+  port is **not** opened here — caller identity is consumer policy; a
+  consumer grants it with its own allow policy naming the caller's namespace
+  and pod labels.
+
+The default-deny is scoped to the namespace, not to the workload whose
+overlay renders it. Include it in every overlay that relies on it: each
+overlay's `namePrefix` gives its copy a distinct name, so the copies coexist
+as separate objects carrying the same rule — their union is the same deny,
+and deleting one workload never lifts the baseline from the others. Give
+every overlay in a namespace its own `namePrefix`; two overlays rendering
+the same name would share one object, and pruning either would delete it.
+
+The deny also covers traffic that reaches pods through a Service. Callers
+behind an in-cluster ingress controller or Gateway implementation are
+admitted by selecting that controller's namespace and pods. Traffic from a
+`LoadBalancer` Service arrives from client, load balancer, or node addresses
+rather than from pods — which one depends on the load balancer and
+`externalTrafficPolicy` — so its allow needs an `ipBlock` covering those
+source ranges.
+
+Selectors carry the same `app: app` placeholder as the Service selectors —
+a consumer's `labels` transform with `includeSelectors: true` rewrites
+`spec.podSelector` and `spec.ingress[].from[].podSelector` together, so the
+peer rule always names the real workload label.
+`examples/pekko-cluster-network-isolation/` composes both components with a
+`pekko-cluster` workload under that transform.
 
 ---
 
