@@ -6,6 +6,38 @@ This project follows Semantic Versioning.
 
 ---
 
+## [1.4.0] - 2026-09-29
+
+### Added
+
+- **`components/server-tls`** — an opt-in Component that mounts an
+  externally managed Secret at `/etc/ssl/server` in the `app` container of
+  a Deployment named `-app`, read-only, projecting `tls.crt` and
+  `tls.key`. Both keys are required (`optional: false`), so a missing
+  Secret or key blocks pod startup rather than enabling plaintext. The
+  component creates no Secret, grants no API permissions, and installs no
+  certificate controller: issuance, renewal, and the rollout that picks up
+  renewed material stay with the operator, and the workload runs on any
+  conformant cluster. The application must still enable TLS and load the
+  files itself — mounting does not enable TLS, HTTP/2, or reload.
+- **`examples/server-tls`** — composes the component with the
+  `deployment-http` workload and a ServiceAccount, demonstrates a consumer
+  patch renaming the Secret, and retains an independent application-data
+  mount alongside it.
+- **README** — a Server TLS Files section documenting the Secret contract,
+  operator renewal and rollout responsibilities, and the pass-through
+  requirement for a LoadBalancer fronting an application-terminated TLS
+  listener.
+
+### Changed
+
+- **Component validation in CI** — a `kind: Component` kustomization cannot
+  be built standalone, so validation now requires a composition example at
+  `examples/<component>` and builds that instead. Plain kustomizations
+  keep the previous direct-build check.
+
+---
+
 ## [1.3.0] - 2026-09-28
 
 ### Added
