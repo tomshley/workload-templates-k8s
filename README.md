@@ -98,6 +98,7 @@ components/
   networkpolicy-pekko-cluster-peering/ — Pekko remoting/management allow between same-app pods
   pdb/                    — PodDisruptionBudget
   rbac-pod-reader/        — RBAC Role + RoleBinding for pod discovery
+  server-tls/             — Opt-in Deployment mount of an externally managed TLS Secret
   service-headless-pekko-bootstrap/ — Headless Service for Pekko cluster bootstrapping
   service-public-http/    — Public-facing HTTP Service
   service-tcp-loadbalancer/     — TCP LoadBalancer Service (provider-neutral)
@@ -111,6 +112,7 @@ examples/
   pekko-cluster-network-isolation/        — Default-deny ingress + Pekko cluster peering allow
   scaling-hpa-karpenter-aws/              — HPA + Karpenter NodePool autoscaling (AWS-specific)
   scaling-hpa-karpenter-gcp/              — HPA + Karpenter NodePool autoscaling (GCP-specific)
+  server-tls/                             — TLS file mounting with an external Secret
   service-consumer/                       — Remote consumption patterns
   worker-consumer/                        — Non-HTTP worker Deployment + ServiceAccount composition
 
@@ -324,6 +326,26 @@ The secret name (`my-registry-credentials`) must match:
 2. The `K8S_IMAGE_PULL_SECRET` value in your `.secure_files/.env` (if using GitLab CI)
 
 CI creates the Secret from registry credentials before deploying. Your Kustomize overlay references it.
+
+---
+
+## Server TLS Files
+
+`components/server-tls` is an opt-in Kustomize Component for the `app` container in a Deployment named `-app`. It works with `deployment-http`, `deployment-worker`, and `pekko-cluster`; it does not change workloads unless included under `components:`.
+
+The component mounts a pre-existing Secret named `server-tls` at `/etc/ssl/server`, read-only, projecting `tls.crt` and `tls.key`. Both keys are required. It creates no Secret, grants no API permissions, and installs no certificate controller. File ownership and access restrictions remain the workload owner's responsibility.
+
+Use a consumer patch to select the actual Secret name, as shown in `examples/server-tls`. An external Secret is not renamed by `namePrefix`; its configured name must match a Secret in the workload's namespace. The example also retains an independent application-data mount.
+
+The application must enable TLS and load the certificate chain and private key from those files. Mounting them does not enable TLS, HTTP/2, or certificate reload. A LoadBalancer carrying this listener must pass through TCP if the application terminates TLS.
+
+Before deployment, the operator supplies a trusted certificate chain and matching private key. On renewal, the operator replaces the Secret and performs a controlled workload rollout unless the application explicitly supports reload. Retire old certificate material after the old pods have drained; stopping or removing the workload does not delete the externally owned Secret. A missing Secret or missing required key blocks pod startup rather than enabling plaintext.
+
+Validate the composition without a cluster:
+
+```sh
+kustomize build examples/server-tls
+```
 
 ---
 

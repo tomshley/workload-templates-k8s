@@ -48,7 +48,17 @@ validate-kustomize:
       for dir in components/*/; do
         if [ -f "${dir}kustomization.yaml" ]; then
           echo "Validating ${dir}..."
-          kustomize build "$dir" > /dev/null || FAILED=1
+          if [ "$(awk '$1 == "kind:" { print $2; exit }' "${dir}kustomization.yaml")" = "Component" ]; then
+            example="examples/$(basename "$dir")"
+            if [ ! -f "${example}/kustomization.yaml" ]; then
+              echo "ERROR: ${dir} requires a composition example at ${example}"
+              FAILED=1
+            else
+              kustomize build "$example" > /dev/null || FAILED=1
+            fi
+          else
+            kustomize build "$dir" > /dev/null || FAILED=1
+          fi
         fi
       done
       
