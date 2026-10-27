@@ -88,27 +88,3 @@ For Pekko Cluster with `keep-majority` SBR, production `minReplicas` must be **â
 ```bash
 kustomize build --load-restrictor LoadRestrictionsNone examples/scaling-hpa-karpenter-aws
 ```
-
-## Infrastructure (Terraform)
-
-The Karpenter controller and its prerequisites must exist before this example
-is useful. How you provision them is up to you â€” for example, with Terraform
-modules shaped like:
-
-```hcl
-module "karpenter_prereqs" {
-  source = "root-modules-tf//terraform/modules/aws-eks-karpenter-prereqs"
-  # Creates: IAM roles, instance profile, SQS queue, EventBridge rules
-}
-
-module "karpenter_controller" {
-  source = "root-modules-tf//terraform/modules/aws-eks-karpenter-controller"
-  # Installs: Karpenter Helm chart with IRSA binding
-}
-
-resource "aws_eks_access_entry" "karpenter_node" {
-  cluster_name  = module.cluster.cluster_name
-  principal_arn = module.karpenter_prereqs.node_role_arn
-  type          = "EC2_LINUX"
-}
-```

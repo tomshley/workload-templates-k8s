@@ -6,6 +6,43 @@ This project follows Semantic Versioning.
 
 ---
 
+## [1.5.0] - 2026-10-27
+
+### Added
+
+- **`components/karpenter-nodepool-spot`** — an opt-in, provider-neutral
+  Kustomize Component that lets Karpenter NodePools schedule spot capacity.
+  Layered over any provider wrapper with `components:`, it patches every
+  NodePool in the composition (the patch target intentionally carries no
+  name), widening the base's `karpenter.sh/capacity-type` requirement from
+  `["on-demand"]` to `["spot", "on-demand"]` so Karpenter prefers spot and
+  falls back to on-demand when spot capacity is unavailable. Without the
+  component the default remains on-demand. A leading `test` operation fails
+  closed if the base requirement layout changes. Workloads must tolerate
+  interruption — run at least two replicas plus the `pdb` component.
+- **`examples/karpenter-nodepool-spot`** and
+  **`examples/karpenter-nodepool-spot-aws`** — spot opt-in compositions over
+  the GCP and AWS NodePool wrappers, including each provider's required
+  per-environment NodeClass patch.
+- **README** — spot capacity notes: the AWS prerequisites (the EC2 Spot
+  service-linked role, the controller's interruption-queue setting for
+  two-minute-warning draining, and instance-type flexibility for
+  spot-to-spot consolidation), the GCP preemption notice
+  (`GCENodeClass.spec.preemptionNoticeDuration` on karpenter-provider-gcp
+  v0.7.0+ with `node-problem-detector`), and the controller-side alpha
+  `SpotToSpotConsolidation` feature gate required to replace a spot node
+  with a cheaper spot node.
+
+### Removed
+
+- **Example READMEs** — the Terraform provisioning snippets were dropped
+  from `examples/scaling-hpa-karpenter-aws` and
+  `examples/scaling-hpa-karpenter-gcp`; how the Karpenter controller and its
+  prerequisites are provisioned is the operator's choice and is not this
+  repository's contract.
+
+---
+
 ## [1.4.0] - 2026-09-29
 
 ### Added

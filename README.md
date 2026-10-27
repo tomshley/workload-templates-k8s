@@ -91,9 +91,10 @@ components/
   connection-s3/           — S3-compatible object storage ConfigMap
   credentials-registry/    — Container registry credentials Secret
   hpa/                    — HorizontalPodAutoscaler
-  karpenter-nodepool/     — Karpenter NodePool policy (abstract base for provider wrappers)
-  karpenter-nodepool-aws/ — AWS wrapper: EC2NodeClass + nodeClassRef binding
-  karpenter-nodepool-gcp/ — GCP wrapper: GCENodeClass + nodeClassRef binding
+  karpenter-nodepool/      — Karpenter NodePool policy (abstract base for provider wrappers)
+  karpenter-nodepool-aws/  — AWS wrapper: EC2NodeClass + nodeClassRef binding
+  karpenter-nodepool-gcp/  — GCP wrapper: GCENodeClass + nodeClassRef binding
+  karpenter-nodepool-spot/ — Opt-in spot capacity patch for provider NodePools
   networkpolicy-default-deny-ingress/  — Deny-all ingress NetworkPolicy baseline for the namespace
   networkpolicy-pekko-cluster-peering/ — Pekko remoting/management allow between same-app pods
   pdb/                    — PodDisruptionBudget
@@ -107,6 +108,8 @@ components/
 
 examples/
   image-pull-secret/                      — imagePullSecrets patch pattern
+  karpenter-nodepool-spot/                — Spot opt-in over the GCP NodePool wrapper
+  karpenter-nodepool-spot-aws/            — Spot opt-in over the AWS NodePool wrapper
   pekko-cluster-dns-bootstrap/            — DNS-based Pekko Cluster bootstrap
   pekko-cluster-kubernetes-api-bootstrap/ — Kubernetes API-based Pekko Cluster bootstrap
   pekko-cluster-network-isolation/        — Default-deny ingress + Pekko cluster peering allow
@@ -489,6 +492,17 @@ Karpenter splits across two components following the wrapper pattern from
   only — change both in the same overlay. The node service account is a
   fail-closed placeholder patched per environment, like the AWS wrapper's
   `role`.
+- **`karpenter-nodepool-spot`** — an opt-in provider-neutral component layered
+  over any provider wrapper with `components:` (see
+  `examples/karpenter-nodepool-spot` for GCP and
+  `examples/karpenter-nodepool-spot-aws` for AWS). It widens the base's
+  capacity-type requirement to `["spot", "on-demand"]`; without it the default
+  remains on-demand. Workloads must tolerate interruption (at least two
+  replicas plus the `pdb` component). Replacing a spot node with a cheaper
+  spot node additionally requires the controller's alpha
+  `SpotToSpotConsolidation` feature gate (off by default), a controller
+  install setting outside these templates — see
+  [Karpenter: spot consolidation](https://karpenter.sh/docs/concepts/disruption/#spot-consolidation).
 
 Other Karpenter providers (Azure, Cluster API, …) pair the same base
 with their own NodeClass kind — sibling `karpenter-nodepool-<provider>`
@@ -501,6 +515,27 @@ alone.
 - IAM roles for controller (IRSA) and node instances
 - Discovery tags on VPC subnets and security groups: `karpenter.sh/discovery: <cluster-name>`
 - EKS access entry for the Karpenter node role (type: `EC2_LINUX`)
+
+**Additionally, with `karpenter-nodepool-spot` (AWS):**
+- EC2 Spot service-linked role in the account. Unless the account has already
+  used EC2 Spot, launches fail with `ServiceLinkedRoleCreationNotPermitted`;
+  create it once with
+  `aws iam create-service-linked-role --aws-service-name spot.amazonaws.com`
+  ([Karpenter troubleshooting](https://karpenter.sh/docs/troubleshooting/#missing-service-linked-role)).
+- Interruption handling: the controller's interruption queue setting
+  (`--interruption-queue` / `INTERRUPTION_QUEUE`) names the SQS queue that
+  receives EC2 interruption events. When it is not set, interruption handling
+  is disabled; when it is set, Karpenter drains a spot node and starts its
+  replacement on the two-minute spot interruption warning
+  ([settings](https://karpenter.sh/docs/reference/settings/),
+  [interruption](https://karpenter.sh/docs/concepts/disruption/#interruption)).
+- Instance-type flexibility: the wrapper allows two instance types. Karpenter
+  recommends a list of instance types rather than a single value
+  ([instance types](https://karpenter.sh/docs/concepts/nodepools/#instance-types)),
+  and single-node spot-to-spot consolidation requires at least 15 eligible
+  instance types
+  ([spot consolidation](https://karpenter.sh/docs/concepts/disruption/#spot-consolidation)),
+  so widen `node.kubernetes.io/instance-type` in your overlay when using spot.
 
 **Required patches:** The EC2NodeClass template uses PLACEHOLDERs that must be replaced per environment:
 
@@ -520,6 +555,15 @@ Where `patches/ec2nodeclass-env.yaml` replaces `PLACEHOLDER_KARPENTER_NODE_ROLE`
 **Prerequisites (GCP wrapper):**
 - Karpenter GCP provider controller installed in a GKE Standard cluster, with the controller IAM from the provider's `deploy/iam/karpenter-controller-role.yaml`
 - A dedicated least-privilege node service account (`roles/container.nodeServiceAccount`)
+
+**Additionally, with `karpenter-nodepool-spot` (GCP):**
+- Preemption notice: karpenter-provider-gcp v0.7.0+ gives up to two minutes'
+  warning before GCE reclaims a Spot VM when
+  `GCENodeClass.spec.preemptionNoticeDuration` (for example `120s`) is set and
+  the chart's `node-problem-detector.enabled=true`. The field changes nothing
+  without the detector. v0.6.x has no such field, so Karpenter learns of a
+  preemption only once shutdown starts
+  ([spot preemption](https://github.com/cloudpilot-ai/karpenter-provider-gcp/blob/main/docs/spot-preemption.md)).
 
 **Required patches:** The GCENodeClass template's `serviceAccount` is a PLACEHOLDER that must be replaced per environment:
 
