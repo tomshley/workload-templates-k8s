@@ -1,0 +1,11 @@
+# Allowing both capacity types lets Karpenter prefer spot and fall back to
+# on-demand when spot capacity is unavailable.
+- op: test
+  path: /spec/template/spec/requirements/0
+  value:
+    key: karpenter.sh/capacity-type
+    operator: In
+    values: ["on-demand"]
+- op: replace
+  path: /spec/template/spec/requirements/0/values
+  value: ["spot", "on-demand"]

@@ -119,30 +119,3 @@ For Pekko Cluster with `keep-majority` SBR, production `minReplicas` must be **�
 ```bash
 kustomize build --load-restrictor LoadRestrictionsNone examples/scaling-hpa-karpenter-gcp
 ```
-
-## Infrastructure (Terraform)
-
-The Karpenter controller and its prerequisites must exist before this example
-is useful. How you provision them is up to you — for example, with Terraform
-modules shaped like:
-
-```hcl
-module "karpenter_prereqs" {
-  source = "root-modules-tf//terraform/modules/gcp-karpenter-prereqs"
-  # Creates: least-privilege controller role, controller service account
-  #          (via gcp-gke-workload-identity), actAs on the node account
-}
-
-module "karpenter_controller" {
-  source = "root-modules-tf//terraform/modules/gcp-gke-karpenter-controller"
-  # Installs: provider CRD + controller charts; sets the node service
-  #           account as the controller default
-}
-```
-
-Feed the outputs into `patches/gcenodeclass-env.yaml`:
-
-- `spec.serviceAccount` ← `module.karpenter_prereqs.node_service_account_email`
-- `spec.networkTags` ← `module.karpenter_controller.node_class_network_tags`
-  (the controller module documents that this list is used verbatim in every
-  NodeClass; omit the field when the list is empty)
