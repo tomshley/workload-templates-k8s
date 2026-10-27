@@ -1,0 +1,16 @@
+# Opt-in patch that allows Karpenter NodePools to use spot capacity.
+# Compose it over a provider wrapper (for example, karpenter-nodepool-gcp or
+# karpenter-nodepool-aws) with `components:`. It applies to every NodePool in
+# the composition because the target intentionally has no name.
+# Workloads must tolerate interruption: use at least two replicas and the
+# `pdb` component. The test operation fails closed if the base requirement
+# layout changes.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+patches:
+  - path: nodepool-spot.yaml
+    target:
+      group: karpenter.sh
+      version: v1
+      kind: NodePool
