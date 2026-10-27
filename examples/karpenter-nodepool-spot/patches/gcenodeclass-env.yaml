@@ -1,0 +1,6 @@
+apiVersion: karpenter.k8s.gcp/v1alpha1
+kind: GCENodeClass
+metadata:
+  name: -default
+spec:
+  serviceAccount: my-service-nodes@my-project.iam.gserviceaccount.com
